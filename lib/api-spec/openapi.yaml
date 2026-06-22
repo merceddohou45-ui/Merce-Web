@@ -3,13 +3,22 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Merced's Trading Bot API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: broker
+    description: Broker connection operations
+  - name: trading
+    description: Trading market and signal operations
+  - name: profile
+    description: User trading profile operations
+  - name: signals
+    description: Signal history operations
+
 paths:
   /healthz:
     get:
@@ -24,6 +33,147 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /broker/connect:
+    post:
+      operationId: connectBroker
+      tags: [broker]
+      summary: Connect to a broker
+      description: Connect user's broker account using API credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrokerInput"
+      responses:
+        "200":
+          description: Broker connected successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrokerConnection"
+        "400":
+          description: Invalid credentials
+
+  /broker/status:
+    get:
+      operationId: getBrokerStatus
+      tags: [broker]
+      summary: Get current broker connection status
+      responses:
+        "200":
+          description: Broker status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrokerConnection"
+
+  /broker/disconnect:
+    post:
+      operationId: disconnectBroker
+      tags: [broker]
+      summary: Disconnect from broker
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /assets:
+    get:
+      operationId: getAssets
+      tags: [trading]
+      summary: Get all tradable assets from connected broker
+      description: Returns only real broker symbols, never invented names
+      responses:
+        "200":
+          description: List of broker assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Asset"
+
+  /scan:
+    get:
+      operationId: scanMarkets
+      tags: [trading]
+      summary: Scan all markets and generate trading signals
+      description: Analyzes all broker markets and returns current trading opportunities
+      responses:
+        "200":
+          description: List of trading signals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Signal"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get user trading profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradingProfile"
+    post:
+      operationId: saveProfile
+      tags: [profile]
+      summary: Save user trading profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradingProfileInput"
+      responses:
+        "200":
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradingProfile"
+
+  /signals/history:
+    get:
+      operationId: getSignalHistory
+      tags: [signals]
+      summary: Get signal history
+      description: Returns all past signals generated for the user
+      responses:
+        "200":
+          description: Signal history list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SignalRecord"
+
+  /signals/stats:
+    get:
+      operationId: getSignalStats
+      tags: [signals]
+      summary: Get signal performance statistics
+      description: Returns summary stats — total signals, win rate, profit estimate, confidence avg
+      responses:
+        "200":
+          description: Signal statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +184,226 @@ components:
       required:
         - status
 
+    BrokerInput:
+      type: object
+      required:
+        - broker
+        - apiKey
+        - apiSecret
+      properties:
+        broker:
+          type: string
+          description: Broker name (e.g. Binance, Bybit, Exness, MetaTrader)
+        apiKey:
+          type: string
+        apiSecret:
+          type: string
+        serverUrl:
+          type: ["string", "null"]
+          description: Optional custom server URL for MT4/MT5
+
+    BrokerConnection:
+      type: object
+      required:
+        - connected
+        - broker
+      properties:
+        connected:
+          type: boolean
+        broker:
+          type: string
+        accountId:
+          type: ["string", "null"]
+        balance:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        connectedAt:
+          type: ["string", "null"]
+
+    Asset:
+      type: object
+      required:
+        - symbol
+        - name
+        - type
+        - category
+      properties:
+        symbol:
+          type: string
+          description: Official broker symbol (e.g. XAUUSD, BTCUSDT)
+        name:
+          type: string
+        type:
+          type: string
+          description: "forex, crypto, indices, commodities"
+        category:
+          type: string
+        spread:
+          type: ["number", "null"]
+        pip:
+          type: ["number", "null"]
+
+    Signal:
+      type: object
+      required:
+        - symbol
+        - direction
+        - entry
+        - stopLoss
+        - takeProfit1
+        - takeProfit2
+        - takeProfit3
+        - timeframe
+        - confidence
+        - riskPercent
+      properties:
+        symbol:
+          type: string
+        direction:
+          type: string
+          description: "BUY or SELL"
+        entry:
+          type: number
+        stopLoss:
+          type: number
+        takeProfit1:
+          type: number
+        takeProfit2:
+          type: number
+        takeProfit3:
+          type: number
+        timeframe:
+          type: string
+        confidence:
+          type: integer
+          description: Confidence percentage 0-100
+        riskPercent:
+          type: number
+        reason:
+          type: ["string", "null"]
+          description: Brief analysis reason for the signal
+        generatedAt:
+          type: ["string", "null"]
+
+    SignalRecord:
+      type: object
+      required:
+        - id
+        - symbol
+        - direction
+        - entry
+        - stopLoss
+        - takeProfit1
+        - timeframe
+        - confidence
+        - status
+        - generatedAt
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        direction:
+          type: string
+        entry:
+          type: number
+        stopLoss:
+          type: number
+        takeProfit1:
+          type: number
+        takeProfit2:
+          type: number
+        takeProfit3:
+          type: number
+        timeframe:
+          type: string
+        confidence:
+          type: integer
+        status:
+          type: string
+          description: "active, won, lost, closed"
+        riskPercent:
+          type: number
+        profitLoss:
+          type: ["number", "null"]
+        generatedAt:
+          type: string
+
+    SignalStats:
+      type: object
+      required:
+        - totalSignals
+        - activeSignals
+        - winRate
+        - avgConfidence
+        - estimatedProfit
+        - totalWon
+        - totalLost
+      properties:
+        totalSignals:
+          type: integer
+        activeSignals:
+          type: integer
+        winRate:
+          type: number
+        avgConfidence:
+          type: number
+        estimatedProfit:
+          type: number
+        totalWon:
+          type: integer
+        totalLost:
+          type: integer
+
+    TradingProfileInput:
+      type: object
+      required:
+        - capital
+        - profitTarget
+        - riskLevel
+        - timeframe
+      properties:
+        capital:
+          type: number
+        profitTarget:
+          type: number
+          description: Target profit amount in dollars
+        profitTargetPercent:
+          type: ["number", "null"]
+          description: Profit target as percentage (e.g. 20 for 20%)
+        riskLevel:
+          type: string
+          description: "LOW, MEDIUM, HIGH"
+        timeframe:
+          type: string
+          description: "M1, M5, M15, H1, H4"
+
+    TradingProfile:
+      type: object
+      required:
+        - id
+        - capital
+        - profitTarget
+        - riskLevel
+        - timeframe
+        - createdAt
+      properties:
+        id:
+          type: integer
+        capital:
+          type: number
+        profitTarget:
+          type: number
+        profitTargetPercent:
+          type: ["number", "null"]
+        riskLevel:
+          type: string
+        timeframe:
+          type: string
+        broker:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: ["string", "null"]

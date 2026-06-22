@@ -1,0 +1,206 @@
+OBJECTIF GLOBAL
+
+Créer une application web appelée “Merced’s Trading Bot”.
+
+Cette application permet à un utilisateur de :
+
+connecter son broker / application de trading
+définir son capital
+définir son objectif de profit
+recevoir des signaux de trading en temps réel
+analyser automatiquement tous les marchés disponibles du broker connecté
+🔌 1. CONNEXION BROKER (OBLIGATOIRE)
+
+L’utilisateur doit connecter son application de trading (broker).
+
+Exemples :
+
+Binance
+MetaTrader
+Bybit
+Exness
+Autre API trading
+⚙️ COMPORTEMENT
+
+Une fois connecté :
+
+récupérer automatiquement tous les actifs du broker
+ne jamais utiliser de données externes
+ne jamais inventer de symboles
+❌ INTERDIT
+Gold ❌
+Bitcoin ❌
+Euro ❌
+Nasdaq ❌
+noms marketing ❌
+✅ AUTORISÉ UNIQUEMENT
+
+Symboles broker réels :
+
+XAUUSD
+BTCUSDT
+EURUSD
+GBPUSD
+USDJPY
+US30
+NAS100
+etc.
+🧠 2. SCAN AUTOMATIQUE DES MARCHÉS
+
+Après connexion :
+
+Le bot doit :
+
+récupérer tous les marchés disponibles du broker
+scanner en continu
+analyser tendance, volatilité, momentum
+détecter opportunités BUY / SELL
+🔁 LOGIQUE
+Connect broker → Get assets → Scan all markets → Generate signals
+💰 3. ONBOARDING UTILISATEUR
+
+Avant accès aux signaux :
+
+Champs obligatoires :
+💰 Capital
+
+Ex : 100$, 500$, 1000$, 10 000$
+
+🎯 PROFIT TARGET (IMPORTANT)
+
+L’utilisateur choisit son objectif :
+
++10%
++20%
++50%
++100%
+valeur personnalisée
+
+👉 Exemple :
+1000$ → +20% = 1200$
+
+⚖️ RISK LEVEL
+Low Risk
+Medium Risk
+High Risk
+⏱ TIMEFRAME
+M1
+M5
+M15
+H1
+H4
+🧠 4. LOGIQUE INTELLIGENTE DU BOT
+
+Le bot doit adapter tout selon :
+
+capital
+profit target
+risk level
+broker assets
+📊 RÈGLES :
+Low Risk
+signaux très filtrés
+80–90% confiance minimum
+Medium Risk
+équilibre fréquence / qualité
+High Risk
+plus de signaux
+filtrage plus flexible
+📈 5. FORMAT DES SIGNAUX
+
+Chaque signal doit être :
+
+{
+  "symbol": "XAUUSD",
+  "direction": "BUY",
+  "entry": 2034.50,
+  "stopLoss": 2028.00,
+  "takeProfit1": 2042.00,
+  "takeProfit2": 2050.00,
+  "takeProfit3": 2060.00,
+  "timeframe": "M5",
+  "confidence": 87,
+  "riskPercent": 1,
+  "userProfile": {
+    "capital": 1000,
+    "profitTarget": 1200,
+    "riskLevel": "MEDIUM",
+    "broker": "Exness"
+  }
+}
+🌐 6. BACKEND (NODE.JS)
+
+Créer API :
+
+GET /assets
+
+Retourne les actifs du broker connecté
+
+GET /scan
+
+Analyse tous les marchés et retourne signaux
+
+POST /connect-broker
+
+Connecte le broker utilisateur
+
+WS /live-signals
+
+Envoie signaux en temps réel
+
+🏠 7. UI — PAGE PRINCIPALE
+HERO
+
+“Trade Smarter with Real Market Intelligence”
+
+🔌 CONNECT BROKER SCREEN
+sélection broker
+connexion API
+💰 SETUP TRADING PROFILE
+capital
+profit target
+risk level
+timeframe
+📊 TRADABLE MARKETS
+
+Afficher uniquement les assets du broker :
+
+XAUUSD
+BTCUSDT
+EURUSD
+GBPUSD
+USDJPY
+US30
+NAS100
+⚠️ TEXTE UI IMPORTANT
+
+“These are official trading symbols provided by your connected broker.”
+
+🔔 8. REAL-TIME SYSTEM
+scan automatique toutes les 5–10 secondes
+WebSocket live updates
+notifications instantanées
+historique des signaux
+🎨 9. DESIGN
+dark fintech UI
+glassmorphism cards
+blue / green / red glow
+animations smooth
+mobile responsive
+🧠 10. RÈGLE ABSOLUE
+The system ONLY analyzes markets provided by the connected broker. No external or renamed assets are allowed.
+🚀 NOM OFFICIEL
+
+Merced’s Trading Bot
+
+⚡ INSTRUCTION FINALE
+
+Générer automatiquement :
+
+frontend complet
+backend Node.js complet
+WebSocket live system
+onboarding utilisateur
+connexion broker (mock ou real-ready)
+UI premium fintech
+code propre, structuré et prêt à exécuter sur Replit
