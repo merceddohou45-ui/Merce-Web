@@ -9,6 +9,7 @@ import Setup from "@/pages/setup";
 import Dashboard from "@/pages/dashboard";
 import Signals from "@/pages/signals";
 import Portfolio from "@/pages/portfolio";
+import Psychology from "@/pages/psychology";
 import { Layout } from "@/components/layout";
 
 const queryClient = new QueryClient({
@@ -39,6 +40,11 @@ function Router() {
       <Route path="/portfolio">
         <Layout>
           <Portfolio />
+        </Layout>
+      </Route>
+      <Route path="/psychology">
+        <Layout>
+          <Psychology />
         </Layout>
       </Route>
       <Route component={NotFound} />

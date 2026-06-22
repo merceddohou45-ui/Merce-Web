@@ -6,6 +6,7 @@ import profileRouter from "./profile";
 import signalsRouter from "./signals";
 import portfolioRouter from "./portfolio";
 import { journalRouter } from "./journal";
+import { analyticsRouter } from "./analytics";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(profileRouter);
 router.use(signalsRouter);
 router.use(portfolioRouter);
 router.use(journalRouter);
+router.use(analyticsRouter);
 
 export default router;

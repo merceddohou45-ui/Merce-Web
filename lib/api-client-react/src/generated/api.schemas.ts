@@ -98,6 +98,32 @@ export interface SignalStats {
   totalLost: number;
 }
 
+export interface EmotionStat {
+  emotion: string;
+  totalEntries: number;
+  linkedPositions: number;
+  winCount: number;
+  lossCount: number;
+  /** @nullable */
+  winRate?: number | null;
+  /** @nullable */
+  avgPnl?: number | null;
+}
+
+export type PsychologyAnalyticsEntryTypeBreakdown = {[key: string]: number};
+
+export interface PsychologyAnalytics {
+  emotionStats: EmotionStat[];
+  /** @nullable */
+  topWinEmotion?: string | null;
+  /** @nullable */
+  topLossEmotion?: string | null;
+  insights: string[];
+  entryTypeBreakdown: PsychologyAnalyticsEntryTypeBreakdown;
+  totalEntries: number;
+  totalPositionsWithJournal: number;
+}
+
 export interface JournalEntry {
   id: number;
   positionId: number;

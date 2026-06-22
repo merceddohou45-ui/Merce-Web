@@ -159,6 +159,29 @@ export const GetSignalHistoryResponse = zod.array(GetSignalHistoryResponseItem)
 
 
 /**
+ * Aggregates emotion tags from journal entries and correlates with position outcomes
+ * @summary Get psychology analytics based on journal entries
+ */
+export const GetPsychologyAnalyticsResponse = zod.object({
+  "emotionStats": zod.array(zod.object({
+  "emotion": zod.string(),
+  "totalEntries": zod.number(),
+  "linkedPositions": zod.number(),
+  "winCount": zod.number(),
+  "lossCount": zod.number(),
+  "winRate": zod.number().nullish(),
+  "avgPnl": zod.number().nullish()
+})),
+  "topWinEmotion": zod.string().nullish(),
+  "topLossEmotion": zod.string().nullish(),
+  "insights": zod.array(zod.string()),
+  "entryTypeBreakdown": zod.record(zod.string(), zod.number()),
+  "totalEntries": zod.number(),
+  "totalPositionsWithJournal": zod.number()
+})
+
+
+/**
  * @summary Get journal entries for a position
  */
 export const GetJournalEntriesParams = zod.object({

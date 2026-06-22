@@ -20,6 +20,8 @@ tags:
     description: Signal history operations
   - name: journal
     description: Trade journal operations
+  - name: analytics
+    description: Psychology and performance analytics
 
 paths:
   /healthz:
@@ -161,6 +163,20 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SignalRecord"
+
+  /analytics/psychology:
+    get:
+      operationId: getPsychologyAnalytics
+      tags: [analytics]
+      summary: Get psychology analytics based on journal entries
+      description: Aggregates emotion tags from journal entries and correlates with position outcomes
+      responses:
+        "200":
+          description: Psychology analytics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PsychologyAnalytics"
 
   /journal/{positionId}:
     get:
@@ -522,6 +538,60 @@ components:
         totalWon:
           type: integer
         totalLost:
+          type: integer
+
+    EmotionStat:
+      type: object
+      required:
+        - emotion
+        - totalEntries
+        - linkedPositions
+        - winCount
+        - lossCount
+      properties:
+        emotion:
+          type: string
+        totalEntries:
+          type: integer
+        linkedPositions:
+          type: integer
+        winCount:
+          type: integer
+        lossCount:
+          type: integer
+        winRate:
+          type: ["number", "null"]
+        avgPnl:
+          type: ["number", "null"]
+
+    PsychologyAnalytics:
+      type: object
+      required:
+        - emotionStats
+        - insights
+        - entryTypeBreakdown
+        - totalEntries
+        - totalPositionsWithJournal
+      properties:
+        emotionStats:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmotionStat"
+        topWinEmotion:
+          type: ["string", "null"]
+        topLossEmotion:
+          type: ["string", "null"]
+        insights:
+          type: array
+          items:
+            type: string
+        entryTypeBreakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        totalEntries:
+          type: integer
+        totalPositionsWithJournal:
           type: integer
 
     JournalEntry:

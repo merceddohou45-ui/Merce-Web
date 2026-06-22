@@ -30,6 +30,7 @@ import type {
   OpenPositionInput,
   PortfolioPosition,
   PortfolioSummary,
+  PsychologyAnalytics,
   Signal,
   SignalRecord,
   SignalStats,
@@ -716,6 +717,84 @@ export function useGetSignalHistory<TData = Awaited<ReturnType<typeof getSignalH
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSignalHistoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPsychologyAnalyticsUrl = () => {
+
+
+
+
+  return `/api/analytics/psychology`
+}
+
+/**
+ * Aggregates emotion tags from journal entries and correlates with position outcomes
+ * @summary Get psychology analytics based on journal entries
+ */
+export const getPsychologyAnalytics = async ( options?: RequestInit): Promise<PsychologyAnalytics> => {
+
+  return customFetch<PsychologyAnalytics>(getGetPsychologyAnalyticsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPsychologyAnalyticsQueryKey = () => {
+    return [
+    `/api/analytics/psychology`
+    ] as const;
+    }
+
+
+export const getGetPsychologyAnalyticsQueryOptions = <TData = Awaited<ReturnType<typeof getPsychologyAnalytics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPsychologyAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPsychologyAnalyticsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPsychologyAnalytics>>> = ({ signal }) => getPsychologyAnalytics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPsychologyAnalytics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPsychologyAnalyticsQueryResult = NonNullable<Awaited<ReturnType<typeof getPsychologyAnalytics>>>
+export type GetPsychologyAnalyticsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get psychology analytics based on journal entries
+ */
+
+export function useGetPsychologyAnalytics<TData = Awaited<ReturnType<typeof getPsychologyAnalytics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPsychologyAnalytics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPsychologyAnalyticsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
