@@ -12,6 +12,8 @@ export * from './brokerInput';
 export * from './closePositionInput';
 export * from './equityPoint';
 export * from './healthStatus';
+export * from './journalEntry';
+export * from './journalEntryInput';
 export * from './openPositionInput';
 export * from './portfolioPosition';
 export * from './portfolioSummary';

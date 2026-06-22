@@ -98,6 +98,42 @@ export interface SignalStats {
   totalLost: number;
 }
 
+export interface JournalEntry {
+  id: number;
+  positionId: number;
+  /** open, close, note */
+  entryType: string;
+  /**
+     * CONFIDENT, DISCIPLINED, NERVOUS, FOMO, PATIENT, GREEDY, FEARFUL, NEUTRAL
+     * @nullable
+     */
+  emotion?: string | null;
+  /**
+     * Why the trader entered or is noting this
+     * @nullable
+     */
+  reasoning?: string | null;
+  /**
+     * Free-form personal notes
+     * @nullable
+     */
+  notes?: string | null;
+  createdAt: string;
+  /** @nullable */
+  updatedAt?: string | null;
+}
+
+export interface JournalEntryInput {
+  positionId: number;
+  entryType: string;
+  /** @nullable */
+  emotion?: string | null;
+  /** @nullable */
+  reasoning?: string | null;
+  /** @nullable */
+  notes?: string | null;
+}
+
 export interface PortfolioPosition {
   id: number;
   /** @nullable */

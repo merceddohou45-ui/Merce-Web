@@ -18,6 +18,8 @@ tags:
     description: User trading profile operations
   - name: signals
     description: Signal history operations
+  - name: journal
+    description: Trade journal operations
 
 paths:
   /healthz:
@@ -159,6 +161,98 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/SignalRecord"
+
+  /journal/{positionId}:
+    get:
+      operationId: getJournalEntries
+      tags: [journal]
+      summary: Get journal entries for a position
+      parameters:
+        - name: positionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Journal entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JournalEntry"
+
+  /journal:
+    post:
+      operationId: createJournalEntry
+      tags: [journal]
+      summary: Create a journal entry for a position
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalEntryInput"
+      responses:
+        "200":
+          description: Created entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+
+  /journal/{positionId}/entry/{id}:
+    patch:
+      operationId: updateJournalEntry
+      tags: [journal]
+      summary: Update a journal entry
+      parameters:
+        - name: positionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalEntryInput"
+      responses:
+        "200":
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntry"
+    delete:
+      operationId: deleteJournalEntry
+      tags: [journal]
+      summary: Delete a journal entry
+      parameters:
+        - name: positionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
 
   /portfolio/positions:
     get:
@@ -429,6 +523,52 @@ components:
           type: integer
         totalLost:
           type: integer
+
+    JournalEntry:
+      type: object
+      required:
+        - id
+        - positionId
+        - entryType
+        - createdAt
+      properties:
+        id:
+          type: integer
+        positionId:
+          type: integer
+        entryType:
+          type: string
+          description: "open, close, note"
+        emotion:
+          type: ["string", "null"]
+          description: "CONFIDENT, DISCIPLINED, NERVOUS, FOMO, PATIENT, GREEDY, FEARFUL, NEUTRAL"
+        reasoning:
+          type: ["string", "null"]
+          description: Why the trader entered or is noting this
+        notes:
+          type: ["string", "null"]
+          description: Free-form personal notes
+        createdAt:
+          type: string
+        updatedAt:
+          type: ["string", "null"]
+
+    JournalEntryInput:
+      type: object
+      required:
+        - positionId
+        - entryType
+      properties:
+        positionId:
+          type: integer
+        entryType:
+          type: string
+        emotion:
+          type: ["string", "null"]
+        reasoning:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
 
     PortfolioPosition:
       type: object

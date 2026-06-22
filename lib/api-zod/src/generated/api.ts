@@ -159,6 +159,90 @@ export const GetSignalHistoryResponse = zod.array(GetSignalHistoryResponseItem)
 
 
 /**
+ * @summary Get journal entries for a position
+ */
+export const GetJournalEntriesParams = zod.object({
+  "positionId": zod.coerce.number()
+})
+
+export const GetJournalEntriesResponseItem = zod.object({
+  "id": zod.number(),
+  "positionId": zod.number(),
+  "entryType": zod.string().describe('open, close, note'),
+  "emotion": zod.string().nullish().describe('CONFIDENT, DISCIPLINED, NERVOUS, FOMO, PATIENT, GREEDY, FEARFUL, NEUTRAL'),
+  "reasoning": zod.string().nullish().describe('Why the trader entered or is noting this'),
+  "notes": zod.string().nullish().describe('Free-form personal notes'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish()
+})
+export const GetJournalEntriesResponse = zod.array(GetJournalEntriesResponseItem)
+
+
+/**
+ * @summary Create a journal entry for a position
+ */
+export const CreateJournalEntryBody = zod.object({
+  "positionId": zod.number(),
+  "entryType": zod.string(),
+  "emotion": zod.string().nullish(),
+  "reasoning": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+export const CreateJournalEntryResponse = zod.object({
+  "id": zod.number(),
+  "positionId": zod.number(),
+  "entryType": zod.string().describe('open, close, note'),
+  "emotion": zod.string().nullish().describe('CONFIDENT, DISCIPLINED, NERVOUS, FOMO, PATIENT, GREEDY, FEARFUL, NEUTRAL'),
+  "reasoning": zod.string().nullish().describe('Why the trader entered or is noting this'),
+  "notes": zod.string().nullish().describe('Free-form personal notes'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Update a journal entry
+ */
+export const UpdateJournalEntryParams = zod.object({
+  "positionId": zod.coerce.number(),
+  "id": zod.coerce.number()
+})
+
+export const UpdateJournalEntryBody = zod.object({
+  "positionId": zod.number(),
+  "entryType": zod.string(),
+  "emotion": zod.string().nullish(),
+  "reasoning": zod.string().nullish(),
+  "notes": zod.string().nullish()
+})
+
+export const UpdateJournalEntryResponse = zod.object({
+  "id": zod.number(),
+  "positionId": zod.number(),
+  "entryType": zod.string().describe('open, close, note'),
+  "emotion": zod.string().nullish().describe('CONFIDENT, DISCIPLINED, NERVOUS, FOMO, PATIENT, GREEDY, FEARFUL, NEUTRAL'),
+  "reasoning": zod.string().nullish().describe('Why the trader entered or is noting this'),
+  "notes": zod.string().nullish().describe('Free-form personal notes'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Delete a journal entry
+ */
+export const DeleteJournalEntryParams = zod.object({
+  "positionId": zod.coerce.number(),
+  "id": zod.coerce.number()
+})
+
+export const DeleteJournalEntryResponse = zod.object({
+  "status": zod.string()
+})
+
+
+/**
  * Returns open and closed positions with P&L
  * @summary Get all portfolio positions
  */

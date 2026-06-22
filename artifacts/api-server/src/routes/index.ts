@@ -5,6 +5,7 @@ import tradingRouter from "./trading";
 import profileRouter from "./profile";
 import signalsRouter from "./signals";
 import portfolioRouter from "./portfolio";
+import { journalRouter } from "./journal";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(tradingRouter);
 router.use(profileRouter);
 router.use(signalsRouter);
 router.use(portfolioRouter);
+router.use(journalRouter);
 
 export default router;
