@@ -159,6 +159,139 @@ export const GetSignalHistoryResponse = zod.array(GetSignalHistoryResponseItem)
 
 
 /**
+ * Returns open and closed positions with P&L
+ * @summary Get all portfolio positions
+ */
+export const GetPortfolioPositionsResponseItem = zod.object({
+  "id": zod.number(),
+  "signalId": zod.number().nullish(),
+  "symbol": zod.string(),
+  "direction": zod.string(),
+  "entry": zod.number(),
+  "stopLoss": zod.number(),
+  "takeProfit1": zod.number(),
+  "takeProfit2": zod.number(),
+  "takeProfit3": zod.number(),
+  "timeframe": zod.string(),
+  "confidence": zod.number(),
+  "riskPercent": zod.number(),
+  "lotSize": zod.number(),
+  "capitalAtOpen": zod.number(),
+  "status": zod.string().describe('open, closed_tp1, closed_tp2, closed_tp3, closed_sl, closed_manual'),
+  "closeReason": zod.string().nullish(),
+  "closePrice": zod.number().nullish(),
+  "realizedPnl": zod.number().nullish(),
+  "unrealizedPnl": zod.number().nullish(),
+  "tpHit": zod.string().nullish().describe('TP1, TP2, or TP3'),
+  "isPartialClose": zod.boolean().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+export const GetPortfolioPositionsResponse = zod.array(GetPortfolioPositionsResponseItem)
+
+
+/**
+ * @summary Open a portfolio position from a signal
+ */
+export const OpenPositionFromSignalBody = zod.object({
+  "signalId": zod.number(),
+  "lotSize": zod.number().nullish().describe('Optional lot size override; computed from risk% if omitted')
+})
+
+export const OpenPositionFromSignalResponse = zod.object({
+  "id": zod.number(),
+  "signalId": zod.number().nullish(),
+  "symbol": zod.string(),
+  "direction": zod.string(),
+  "entry": zod.number(),
+  "stopLoss": zod.number(),
+  "takeProfit1": zod.number(),
+  "takeProfit2": zod.number(),
+  "takeProfit3": zod.number(),
+  "timeframe": zod.string(),
+  "confidence": zod.number(),
+  "riskPercent": zod.number(),
+  "lotSize": zod.number(),
+  "capitalAtOpen": zod.number(),
+  "status": zod.string().describe('open, closed_tp1, closed_tp2, closed_tp3, closed_sl, closed_manual'),
+  "closeReason": zod.string().nullish(),
+  "closePrice": zod.number().nullish(),
+  "realizedPnl": zod.number().nullish(),
+  "unrealizedPnl": zod.number().nullish(),
+  "tpHit": zod.string().nullish().describe('TP1, TP2, or TP3'),
+  "isPartialClose": zod.boolean().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Close a position (TP1/TP2/TP3/SL hit or manual)
+ */
+export const ClosePositionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ClosePositionBody = zod.object({
+  "closeReason": zod.string().describe('TP1, TP2, TP3, SL, MANUAL'),
+  "closePrice": zod.number()
+})
+
+export const ClosePositionResponse = zod.object({
+  "id": zod.number(),
+  "signalId": zod.number().nullish(),
+  "symbol": zod.string(),
+  "direction": zod.string(),
+  "entry": zod.number(),
+  "stopLoss": zod.number(),
+  "takeProfit1": zod.number(),
+  "takeProfit2": zod.number(),
+  "takeProfit3": zod.number(),
+  "timeframe": zod.string(),
+  "confidence": zod.number(),
+  "riskPercent": zod.number(),
+  "lotSize": zod.number(),
+  "capitalAtOpen": zod.number(),
+  "status": zod.string().describe('open, closed_tp1, closed_tp2, closed_tp3, closed_sl, closed_manual'),
+  "closeReason": zod.string().nullish(),
+  "closePrice": zod.number().nullish(),
+  "realizedPnl": zod.number().nullish(),
+  "unrealizedPnl": zod.number().nullish(),
+  "tpHit": zod.string().nullish().describe('TP1, TP2, or TP3'),
+  "isPartialClose": zod.boolean().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+
+
+/**
+ * Returns current balance, total P&L, target progress, equity curve data
+ * @summary Get portfolio performance summary
+ */
+export const GetPortfolioSummaryResponse = zod.object({
+  "startingCapital": zod.number(),
+  "currentEquity": zod.number(),
+  "totalPnl": zod.number(),
+  "totalPnlPercent": zod.number(),
+  "profitTarget": zod.number(),
+  "profitTargetPercent": zod.number(),
+  "targetProgress": zod.number().describe('0-100 percent of the way to profit target'),
+  "openPositions": zod.number(),
+  "closedPositions": zod.number(),
+  "winRate": zod.number(),
+  "avgRr": zod.number().describe('Average risk-reward ratio achieved on closed trades'),
+  "bestTrade": zod.number(),
+  "worstTrade": zod.number(),
+  "equityCurve": zod.array(zod.object({
+  "date": zod.string(),
+  "equity": zod.number(),
+  "pnl": zod.number(),
+  "positionsClosed": zod.number().optional()
+}))
+})
+
+
+/**
  * Returns summary stats — total signals, win rate, profit estimate, confidence avg
  * @summary Get signal performance statistics
  */

@@ -98,6 +98,85 @@ export interface SignalStats {
   totalLost: number;
 }
 
+export interface PortfolioPosition {
+  id: number;
+  /** @nullable */
+  signalId?: number | null;
+  symbol: string;
+  direction: string;
+  entry: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2: number;
+  takeProfit3: number;
+  timeframe: string;
+  confidence: number;
+  riskPercent: number;
+  lotSize: number;
+  capitalAtOpen: number;
+  /** open, closed_tp1, closed_tp2, closed_tp3, closed_sl, closed_manual */
+  status: string;
+  /** @nullable */
+  closeReason?: string | null;
+  /** @nullable */
+  closePrice?: number | null;
+  /** @nullable */
+  realizedPnl?: number | null;
+  /** @nullable */
+  unrealizedPnl?: number | null;
+  /**
+     * TP1, TP2, or TP3
+     * @nullable
+     */
+  tpHit?: string | null;
+  /** @nullable */
+  isPartialClose?: boolean | null;
+  openedAt: string;
+  /** @nullable */
+  closedAt?: string | null;
+}
+
+export interface OpenPositionInput {
+  signalId: number;
+  /**
+     * Optional lot size override; computed from risk% if omitted
+     * @nullable
+     */
+  lotSize?: number | null;
+}
+
+export interface ClosePositionInput {
+  /** TP1, TP2, TP3, SL, MANUAL */
+  closeReason: string;
+  closePrice: number;
+}
+
+export interface EquityPoint {
+  date: string;
+  equity: number;
+  pnl: number;
+  positionsClosed?: number;
+}
+
+export interface PortfolioSummary {
+  startingCapital: number;
+  currentEquity: number;
+  totalPnl: number;
+  totalPnlPercent: number;
+  profitTarget: number;
+  profitTargetPercent: number;
+  /** 0-100 percent of the way to profit target */
+  targetProgress: number;
+  openPositions: number;
+  closedPositions: number;
+  winRate: number;
+  /** Average risk-reward ratio achieved on closed trades */
+  avgRr: number;
+  bestTrade: number;
+  worstTrade: number;
+  equityCurve: EquityPoint[];
+}
+
 export interface TradingProfileInput {
   capital: number;
   /** Target profit amount in dollars */

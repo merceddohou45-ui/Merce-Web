@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, LayoutDashboard, History, Settings, LogOut } from "lucide-react";
+import { Activity, LayoutDashboard, History, Settings, LogOut, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -8,6 +8,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/portfolio", label: "Portfolio", icon: PieChart },
     { path: "/signals", label: "Signal History", icon: History },
     { path: "/setup", label: "Settings", icon: Settings },
   ];

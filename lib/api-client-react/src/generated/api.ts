@@ -23,7 +23,11 @@ import type {
   Asset,
   BrokerConnection,
   BrokerInput,
+  ClosePositionInput,
   HealthStatus,
+  OpenPositionInput,
+  PortfolioPosition,
+  PortfolioSummary,
   Signal,
   SignalRecord,
   SignalStats,
@@ -710,6 +714,305 @@ export function useGetSignalHistory<TData = Awaited<ReturnType<typeof getSignalH
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSignalHistoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPortfolioPositionsUrl = () => {
+
+
+
+
+  return `/api/portfolio/positions`
+}
+
+/**
+ * Returns open and closed positions with P&L
+ * @summary Get all portfolio positions
+ */
+export const getPortfolioPositions = async ( options?: RequestInit): Promise<PortfolioPosition[]> => {
+
+  return customFetch<PortfolioPosition[]>(getGetPortfolioPositionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPortfolioPositionsQueryKey = () => {
+    return [
+    `/api/portfolio/positions`
+    ] as const;
+    }
+
+
+export const getGetPortfolioPositionsQueryOptions = <TData = Awaited<ReturnType<typeof getPortfolioPositions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortfolioPositions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPortfolioPositionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPortfolioPositions>>> = ({ signal }) => getPortfolioPositions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPortfolioPositions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPortfolioPositionsQueryResult = NonNullable<Awaited<ReturnType<typeof getPortfolioPositions>>>
+export type GetPortfolioPositionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get all portfolio positions
+ */
+
+export function useGetPortfolioPositions<TData = Awaited<ReturnType<typeof getPortfolioPositions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortfolioPositions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPortfolioPositionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getOpenPositionFromSignalUrl = () => {
+
+
+
+
+  return `/api/portfolio/open-from-signal`
+}
+
+/**
+ * @summary Open a portfolio position from a signal
+ */
+export const openPositionFromSignal = async (openPositionInput: OpenPositionInput, options?: RequestInit): Promise<PortfolioPosition> => {
+
+  return customFetch<PortfolioPosition>(getOpenPositionFromSignalUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      openPositionInput,)
+  }
+);}
+
+
+
+
+export const getOpenPositionFromSignalMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openPositionFromSignal>>, TError,{data: BodyType<OpenPositionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof openPositionFromSignal>>, TError,{data: BodyType<OpenPositionInput>}, TContext> => {
+
+const mutationKey = ['openPositionFromSignal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof openPositionFromSignal>>, {data: BodyType<OpenPositionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  openPositionFromSignal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OpenPositionFromSignalMutationResult = NonNullable<Awaited<ReturnType<typeof openPositionFromSignal>>>
+    export type OpenPositionFromSignalMutationBody = BodyType<OpenPositionInput>
+    export type OpenPositionFromSignalMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Open a portfolio position from a signal
+ */
+export const useOpenPositionFromSignal = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof openPositionFromSignal>>, TError,{data: BodyType<OpenPositionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof openPositionFromSignal>>,
+        TError,
+        {data: BodyType<OpenPositionInput>},
+        TContext
+      > => {
+      return useMutation(getOpenPositionFromSignalMutationOptions(options));
+    }
+
+export const getClosePositionUrl = (id: number,) => {
+
+
+
+
+  return `/api/portfolio/close/${id}`
+}
+
+/**
+ * @summary Close a position (TP1/TP2/TP3/SL hit or manual)
+ */
+export const closePosition = async (id: number,
+    closePositionInput: ClosePositionInput, options?: RequestInit): Promise<PortfolioPosition> => {
+
+  return customFetch<PortfolioPosition>(getClosePositionUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      closePositionInput,)
+  }
+);}
+
+
+
+
+export const getClosePositionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closePosition>>, TError,{id: number;data: BodyType<ClosePositionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof closePosition>>, TError,{id: number;data: BodyType<ClosePositionInput>}, TContext> => {
+
+const mutationKey = ['closePosition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof closePosition>>, {id: number;data: BodyType<ClosePositionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  closePosition(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClosePositionMutationResult = NonNullable<Awaited<ReturnType<typeof closePosition>>>
+    export type ClosePositionMutationBody = BodyType<ClosePositionInput>
+    export type ClosePositionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Close a position (TP1/TP2/TP3/SL hit or manual)
+ */
+export const useClosePosition = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof closePosition>>, TError,{id: number;data: BodyType<ClosePositionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof closePosition>>,
+        TError,
+        {id: number;data: BodyType<ClosePositionInput>},
+        TContext
+      > => {
+      return useMutation(getClosePositionMutationOptions(options));
+    }
+
+export const getGetPortfolioSummaryUrl = () => {
+
+
+
+
+  return `/api/portfolio/summary`
+}
+
+/**
+ * Returns current balance, total P&L, target progress, equity curve data
+ * @summary Get portfolio performance summary
+ */
+export const getPortfolioSummary = async ( options?: RequestInit): Promise<PortfolioSummary> => {
+
+  return customFetch<PortfolioSummary>(getGetPortfolioSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPortfolioSummaryQueryKey = () => {
+    return [
+    `/api/portfolio/summary`
+    ] as const;
+    }
+
+
+export const getGetPortfolioSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getPortfolioSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortfolioSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPortfolioSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPortfolioSummary>>> = ({ signal }) => getPortfolioSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPortfolioSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPortfolioSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getPortfolioSummary>>>
+export type GetPortfolioSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get portfolio performance summary
+ */
+
+export function useGetPortfolioSummary<TData = Awaited<ReturnType<typeof getPortfolioSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPortfolioSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPortfolioSummaryQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

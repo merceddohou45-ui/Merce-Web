@@ -160,6 +160,80 @@ paths:
                 items:
                   $ref: "#/components/schemas/SignalRecord"
 
+  /portfolio/positions:
+    get:
+      operationId: getPortfolioPositions
+      tags: [portfolio]
+      summary: Get all portfolio positions
+      description: Returns open and closed positions with P&L
+      responses:
+        "200":
+          description: List of portfolio positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PortfolioPosition"
+
+  /portfolio/open-from-signal:
+    post:
+      operationId: openPositionFromSignal
+      tags: [portfolio]
+      summary: Open a portfolio position from a signal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenPositionInput"
+      responses:
+        "200":
+          description: Position opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioPosition"
+
+  /portfolio/close/{id}:
+    post:
+      operationId: closePosition
+      tags: [portfolio]
+      summary: Close a position (TP1/TP2/TP3/SL hit or manual)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClosePositionInput"
+      responses:
+        "200":
+          description: Position closed with P&L
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioPosition"
+
+  /portfolio/summary:
+    get:
+      operationId: getPortfolioSummary
+      tags: [portfolio]
+      summary: Get portfolio performance summary
+      description: Returns current balance, total P&L, target progress, equity curve data
+      responses:
+        "200":
+          description: Portfolio summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioSummary"
+
   /signals/stats:
     get:
       operationId: getSignalStats
@@ -355,6 +429,164 @@ components:
           type: integer
         totalLost:
           type: integer
+
+    PortfolioPosition:
+      type: object
+      required:
+        - id
+        - symbol
+        - direction
+        - entry
+        - stopLoss
+        - takeProfit1
+        - takeProfit2
+        - takeProfit3
+        - timeframe
+        - confidence
+        - riskPercent
+        - lotSize
+        - capitalAtOpen
+        - status
+        - openedAt
+      properties:
+        id:
+          type: integer
+        signalId:
+          type: ["integer", "null"]
+        symbol:
+          type: string
+        direction:
+          type: string
+        entry:
+          type: number
+        stopLoss:
+          type: number
+        takeProfit1:
+          type: number
+        takeProfit2:
+          type: number
+        takeProfit3:
+          type: number
+        timeframe:
+          type: string
+        confidence:
+          type: integer
+        riskPercent:
+          type: number
+        lotSize:
+          type: number
+        capitalAtOpen:
+          type: number
+        status:
+          type: string
+          description: "open, closed_tp1, closed_tp2, closed_tp3, closed_sl, closed_manual"
+        closeReason:
+          type: ["string", "null"]
+        closePrice:
+          type: ["number", "null"]
+        realizedPnl:
+          type: ["number", "null"]
+        unrealizedPnl:
+          type: ["number", "null"]
+        tpHit:
+          type: ["string", "null"]
+          description: "TP1, TP2, or TP3"
+        isPartialClose:
+          type: ["boolean", "null"]
+        openedAt:
+          type: string
+        closedAt:
+          type: ["string", "null"]
+
+    OpenPositionInput:
+      type: object
+      required:
+        - signalId
+      properties:
+        signalId:
+          type: integer
+        lotSize:
+          type: ["number", "null"]
+          description: Optional lot size override; computed from risk% if omitted
+
+    ClosePositionInput:
+      type: object
+      required:
+        - closeReason
+        - closePrice
+      properties:
+        closeReason:
+          type: string
+          description: "TP1, TP2, TP3, SL, MANUAL"
+        closePrice:
+          type: number
+
+    EquityPoint:
+      type: object
+      required:
+        - date
+        - equity
+        - pnl
+      properties:
+        date:
+          type: string
+        equity:
+          type: number
+        pnl:
+          type: number
+        positionsClosed:
+          type: integer
+
+    PortfolioSummary:
+      type: object
+      required:
+        - startingCapital
+        - currentEquity
+        - totalPnl
+        - totalPnlPercent
+        - profitTarget
+        - profitTargetPercent
+        - targetProgress
+        - openPositions
+        - closedPositions
+        - winRate
+        - avgRr
+        - bestTrade
+        - worstTrade
+        - equityCurve
+      properties:
+        startingCapital:
+          type: number
+        currentEquity:
+          type: number
+        totalPnl:
+          type: number
+        totalPnlPercent:
+          type: number
+        profitTarget:
+          type: number
+        profitTargetPercent:
+          type: number
+        targetProgress:
+          type: number
+          description: 0-100 percent of the way to profit target
+        openPositions:
+          type: integer
+        closedPositions:
+          type: integer
+        winRate:
+          type: number
+        avgRr:
+          type: number
+          description: Average risk-reward ratio achieved on closed trades
+        bestTrade:
+          type: number
+        worstTrade:
+          type: number
+        equityCurve:
+          type: array
+          items:
+            $ref: "#/components/schemas/EquityPoint"
 
     TradingProfileInput:
       type: object
