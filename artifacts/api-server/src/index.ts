@@ -86,8 +86,8 @@ async function autoScan() {
     const selected = signals.sort(() => Math.random() - 0.5).slice(0, count);
 
     for (const signal of selected) {
-      // Save to history
-      await db.insert(signalHistoryTable).values({
+      // Save to history and get the DB id
+      const [saved] = await db.insert(signalHistoryTable).values({
         symbol: signal.symbol,
         direction: signal.direction,
         entry: signal.entry.toString(),
@@ -100,9 +100,10 @@ async function autoScan() {
         riskPercent: signal.riskPercent.toString(),
         reason: signal.reason,
         status: "active",
-      });
+      }).returning();
 
-      broadcast({ type: "signal", data: signal });
+      // Include the DB id so the frontend can open a portfolio position
+      broadcast({ type: "signal", data: { ...signal, dbId: saved.id } });
     }
 
     logger.debug({ count: selected.length }, "Broadcast live signals");
