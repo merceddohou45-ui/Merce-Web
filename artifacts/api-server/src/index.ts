@@ -3,28 +3,18 @@ import { WebSocketServer, WebSocket } from "ws";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { generateSignals } from "./lib/marketEngine";
-import { db, brokerSessionTable, signalHistoryTable, tradingProfileTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, tradingAccountTable, signalHistoryTable, portfolioPositionTable } from "@workspace/db";
+import { desc, eq } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
+if (!rawPort) throw new Error("PORT environment variable is required but was not provided.");
 const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+if (Number.isNaN(port) || port <= 0) throw new Error(`Invalid PORT value: "${rawPort}"`);
 
 const server = http.createServer(app);
 
 // WebSocket server for live signals
 const wss = new WebSocketServer({ server, path: "/ws/live-signals" });
-
 const clients = new Set<WebSocket>();
 
 wss.on("connection", (ws) => {
@@ -41,8 +31,7 @@ wss.on("connection", (ws) => {
     clients.delete(ws);
   });
 
-  // Send welcome message
-  ws.send(JSON.stringify({ type: "connected", message: "Live signals stream active" }));
+  ws.send(JSON.stringify({ type: "connected", message: "Flux de signaux en direct actif" }));
 });
 
 function broadcast(data: unknown) {
@@ -54,66 +43,66 @@ function broadcast(data: unknown) {
   }
 }
 
-// Auto-scan every 8 seconds and broadcast signals
+// Auto-scan: runs every 30 seconds (quality over quantity)
 async function autoScan() {
   try {
     if (clients.size === 0) return;
 
-    const [session] = await db
+    // Get all configured trading accounts
+    const accounts = await db
       .select()
-      .from(brokerSessionTable)
-      .where(eq(brokerSessionTable.connected, true))
-      .orderBy(desc(brokerSessionTable.connectedAt))
-      .limit(1);
+      .from(tradingAccountTable)
+      .orderBy(desc(tradingAccountTable.createdAt))
+      .limit(10);
 
-    if (!session) return;
+    if (accounts.length === 0) return;
 
-    const [profile] = await db
-      .select()
-      .from(tradingProfileTable)
-      .orderBy(desc(tradingProfileTable.createdAt))
-      .limit(1);
+    // Use the most recently updated account for signal generation
+    const account = accounts[0]!;
 
-    const riskLevel = (profile?.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
-    const timeframe = profile?.timeframe ?? "M5";
+    // Find symbols with open positions to enforce active-position lock
+    const openPositions = await db
+      .select({ symbol: portfolioPositionTable.symbol })
+      .from(portfolioPositionTable)
+      .where(eq(portfolioPositionTable.status, "open"));
 
-    const signals = generateSignals(session.broker, riskLevel, timeframe);
+    const openSymbols = openPositions.map((p) => p.symbol);
+
+    const capital = parseFloat(account.capital);
+    const riskLevel = (account.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
+    const timeframe = account.timeframe ?? "H1";
+
+    const signals = generateSignals(account.platformName, riskLevel, timeframe, capital, openSymbols);
 
     if (signals.length === 0) return;
 
-    // Pick 1-2 signals to broadcast per scan cycle to simulate live feed
-    const count = Math.floor(Math.random() * 2) + 1;
-    const selected = signals.sort(() => Math.random() - 0.5).slice(0, count);
+    // Broadcast at most 1 signal per scan cycle (quality over quantity)
+    const selected = signals[Math.floor(Math.random() * signals.length)]!;
 
-    for (const signal of selected) {
-      // Save to history and get the DB id
-      const [saved] = await db.insert(signalHistoryTable).values({
-        symbol: signal.symbol,
-        direction: signal.direction,
-        entry: signal.entry.toString(),
-        stopLoss: signal.stopLoss.toString(),
-        takeProfit1: signal.takeProfit1.toString(),
-        takeProfit2: signal.takeProfit2.toString(),
-        takeProfit3: signal.takeProfit3.toString(),
-        timeframe: signal.timeframe,
-        confidence: signal.confidence,
-        riskPercent: signal.riskPercent.toString(),
-        reason: signal.reason,
-        status: "active",
-      }).returning();
+    const [saved] = await db.insert(signalHistoryTable).values({
+      symbol: selected.symbol,
+      direction: selected.direction,
+      entry: selected.entry.toString(),
+      stopLoss: selected.stopLoss.toString(),
+      takeProfit1: selected.takeProfit1.toString(),
+      takeProfit2: selected.takeProfit2.toString(),
+      takeProfit3: selected.takeProfit3.toString(),
+      timeframe: selected.timeframe,
+      confidence: selected.confidence,
+      riskPercent: selected.riskPercent.toString(),
+      reason: selected.reason,
+      status: "active",
+    }).returning();
 
-      // Include the DB id so the frontend can open a portfolio position
-      broadcast({ type: "signal", data: { ...signal, dbId: saved.id } });
-    }
-
-    logger.debug({ count: selected.length }, "Broadcast live signals");
+    broadcast({ type: "signal", data: { ...selected, dbId: saved!.id } });
+    logger.info({ symbol: selected.symbol, direction: selected.direction }, "Signal diffusé après analyse complète");
   } catch (err) {
-    logger.error({ err }, "Auto-scan error");
+    logger.error({ err }, "Erreur lors de l'analyse automatique");
   }
 }
 
-// Start scanning interval
-const SCAN_INTERVAL_MS = 8000;
+// 30-second scan interval — quality signals only
+const SCAN_INTERVAL_MS = 30000;
 setInterval(autoScan, SCAN_INTERVAL_MS);
 
 server.listen(port, (err?: Error) => {
@@ -121,6 +110,5 @@ server.listen(port, (err?: Error) => {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
   logger.info({ port }, "Server listening with WebSocket support");
 });

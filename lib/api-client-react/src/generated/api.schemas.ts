@@ -5,6 +5,40 @@
  * Merced's Trading Bot API
  * OpenAPI spec version: 0.1.0
  */
+export interface AuthInput {
+  email: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  hasAccount: boolean;
+}
+
+export interface TradingAccount {
+  id: number;
+  platformName: string;
+  accountId: string;
+  capital: number;
+  profitTarget: number;
+  riskLevel: string;
+  timeframe: string;
+}
+
+export interface TradingAccountInput {
+  platformName: string;
+  accountId: string;
+  /** @nullable */
+  accountPassword?: string | null;
+  capital: number;
+  profitTarget: number;
+  /** @nullable */
+  riskLevel?: string | null;
+  /** @nullable */
+  timeframe?: string | null;
+}
+
 export interface HealthStatus {
   status: string;
 }

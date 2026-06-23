@@ -7,6 +7,8 @@
  */
 
 export * from './asset';
+export * from './authInput';
+export * from './authUser';
 export * from './brokerConnection';
 export * from './brokerInput';
 export * from './closePositionInput';
@@ -23,5 +25,7 @@ export * from './psychologyAnalyticsEntryTypeBreakdown';
 export * from './signal';
 export * from './signalRecord';
 export * from './signalStats';
+export * from './tradingAccount';
+export * from './tradingAccountInput';
 export * from './tradingProfile';
 export * from './tradingProfileInput';

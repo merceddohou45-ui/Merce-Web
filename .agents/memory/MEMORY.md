@@ -1,0 +1,3 @@
+- [Session table must be created manually](session-table.md) — connect-pg-simple v10 createTableIfMissing silently fails; create user_sessions table via SQL before first use
+- [connect-pg-simple pool vs conString](session-table.md) — pass pool from @workspace/db not conString; conString requires pg in api-server direct deps which monorepo doesn't have
+- [Orval TQ v5 query options cast](orval-tq-options.md) — generated hooks require queryKey in UseQueryOptions; cast partial options with `as any` for refetchInterval/enabled overrides

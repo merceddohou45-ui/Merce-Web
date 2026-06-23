@@ -7,9 +7,13 @@ import signalsRouter from "./signals";
 import portfolioRouter from "./portfolio";
 import { journalRouter } from "./journal";
 import { analyticsRouter } from "./analytics";
+import { authRouter } from "./auth";
+import { tradingAccountRouter } from "./tradingAccount";
 
 const router: IRouter = Router();
 
+router.use(authRouter);
+router.use(tradingAccountRouter);
 router.use(healthRouter);
 router.use(brokerRouter);
 router.use(tradingRouter);

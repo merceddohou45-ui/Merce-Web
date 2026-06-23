@@ -14,6 +14,7 @@ import {
   type JournalEntry,
 } from "@workspace/api-client-react";
 import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,6 +44,17 @@ const EMOTIONS = [
   "FEARFUL",
 ] as const;
 
+const EMOTION_LABELS: Record<string, string> = {
+  CONFIDENT: "Confiant",
+  DISCIPLINED: "Discipliné",
+  PATIENT: "Patient",
+  NEUTRAL: "Neutre",
+  NERVOUS: "Nerveux",
+  FOMO: "FOMO",
+  GREEDY: "Cupide",
+  FEARFUL: "Craintif",
+};
+
 const EMOTION_COLORS: Record<string, string> = {
   CONFIDENT: "bg-accent/15 text-accent border-accent/30",
   DISCIPLINED: "bg-blue-500/15 text-blue-400 border-blue-500/30",
@@ -55,6 +67,11 @@ const EMOTION_COLORS: Record<string, string> = {
 };
 
 const ENTRY_TYPES = ["note", "open", "close"] as const;
+const ENTRY_TYPE_LABELS: Record<string, string> = {
+  note: "Note",
+  open: "Analyse d'ouverture",
+  close: "Analyse de clôture",
+};
 
 type PositionAny = {
   id: number;
@@ -90,7 +107,7 @@ function JournalPanel({ position, onClose }: { position: PositionAny; onClose: (
 
   const handleSubmit = async () => {
     if (!reasoning.trim() && !notes.trim()) {
-      toast({ variant: "destructive", title: "Add some content", description: "Fill in reasoning or notes before saving." });
+      toast({ variant: "destructive", title: "Contenu requis", description: "Renseignez l'analyse ou les notes avant de sauvegarder." });
       return;
     }
     setSubmitting(true);
@@ -109,9 +126,9 @@ function JournalPanel({ position, onClose }: { position: PositionAny; onClose: (
       setNotes("");
       setEmotion("NEUTRAL");
       setEntryType("note");
-      toast({ title: "Entry saved" });
+      toast({ title: "Entrée enregistrée" });
     } catch {
-      toast({ variant: "destructive", title: "Could not save entry" });
+      toast({ variant: "destructive", title: "Impossible de sauvegarder" });
     } finally {
       setSubmitting(false);
     }
@@ -122,95 +139,97 @@ function JournalPanel({ position, onClose }: { position: PositionAny; onClose: (
       await deleteEntry.mutateAsync({ positionId: position.id, id: entryId });
       queryClient.invalidateQueries({ queryKey: getGetJournalEntriesQueryKey(position.id) });
     } catch {
-      toast({ variant: "destructive", title: "Could not delete entry" });
+      toast({ variant: "destructive", title: "Impossible de supprimer" });
     }
   };
-
-  const entryTypeLabel: Record<string, string> = { note: "Note", open: "Open Rationale", close: "Close Rationale" };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Position summary */}
-      <div className={`mb-4 p-3 rounded-lg border ${position.direction === "BUY" ? "border-accent/20 bg-accent/5" : "border-destructive/20 bg-destructive/5"}`}>
+      <div className={`mb-4 p-3 rounded-xl border ${position.direction === "BUY" ? "border-accent/20 bg-accent/5" : "border-destructive/20 bg-destructive/5"}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={`font-bold ${position.direction === "BUY" ? "text-accent" : "text-destructive"}`}>
-              {position.direction === "BUY" ? <ArrowUpRight className="inline h-4 w-4 mr-1" /> : <ArrowDownRight className="inline h-4 w-4 mr-1" />}
-              {position.symbol}
+              {position.direction === "BUY"
+                ? <ArrowUpRight className="inline h-4 w-4 mr-1" />
+                : <ArrowDownRight className="inline h-4 w-4 mr-1" />}
+              {position.symbol} — {position.direction === "BUY" ? "ACHAT" : "VENTE"}
             </span>
-            <Badge variant="outline" className="font-mono text-xs">{position.status === "open" ? "OPEN" : position.closeReason ?? "CLOSED"}</Badge>
+            <Badge variant="outline" className="font-mono text-xs">
+              {position.status === "open" ? "OUVERT" : (position.closeReason ?? "CLÔTURÉ")}
+            </Badge>
           </div>
           <span className="font-mono text-sm text-muted-foreground">{position.entry}</span>
         </div>
       </div>
 
       {/* New entry form */}
-      <div className="border border-border rounded-lg p-4 mb-4 space-y-4 bg-card/50">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">New Entry</h3>
+      <div className="border border-border rounded-xl p-4 mb-4 space-y-4 bg-card/50">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nouvelle entrée</h3>
 
         <div>
-          <Label className="text-xs mb-2 block">Entry Type</Label>
-          <RadioGroup value={entryType} onValueChange={setEntryType} className="flex gap-3">
+          <Label className="text-xs mb-2 block">Type d'entrée</Label>
+          <RadioGroup value={entryType} onValueChange={setEntryType} className="flex gap-3 flex-wrap">
             {ENTRY_TYPES.map((t) => (
               <div key={t} className="flex items-center space-x-1.5">
                 <RadioGroupItem value={t} id={`type-${t}`} />
-                <Label htmlFor={`type-${t}`} className="text-sm cursor-pointer">{entryTypeLabel[t]}</Label>
+                <Label htmlFor={`type-${t}`} className="text-xs cursor-pointer">{ENTRY_TYPE_LABELS[t]}</Label>
               </div>
             ))}
           </RadioGroup>
         </div>
 
         <div>
-          <Label className="text-xs mb-2 block">Emotional State</Label>
+          <Label className="text-xs mb-2 block">État émotionnel</Label>
           <div className="flex flex-wrap gap-2">
             {EMOTIONS.map((e) => (
               <button
                 key={e}
                 type="button"
                 onClick={() => setEmotion(e)}
-                className={`px-3 py-1 rounded-full border text-xs font-medium transition-all ${emotion === e ? EMOTION_COLORS[e] : "bg-transparent border-border text-muted-foreground hover:border-muted-foreground"}`}
+                className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${emotion === e ? EMOTION_COLORS[e] : "bg-transparent border-border text-muted-foreground hover:border-muted-foreground"}`}
               >
-                {e}
+                {EMOTION_LABELS[e]}
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <Label htmlFor="reasoning" className="text-xs mb-2 block">Trade Reasoning</Label>
+          <Label htmlFor="reasoning" className="text-xs mb-2 block">Analyse du trade</Label>
           <Textarea
             id="reasoning"
-            placeholder="Why did you take / hold / exit this trade? What was your setup?"
+            placeholder="Pourquoi avez-vous pris / conservé / clôturé ce trade ? Quel était votre setup ?"
             value={reasoning}
             onChange={(e) => setReasoning(e.target.value)}
-            className="h-20 resize-none"
+            className="h-20 resize-none text-sm"
           />
         </div>
 
         <div>
-          <Label htmlFor="notes" className="text-xs mb-2 block">Personal Notes</Label>
+          <Label htmlFor="notes" className="text-xs mb-2 block">Notes personnelles</Label>
           <Textarea
             id="notes"
-            placeholder="Anything else — market conditions, lessons learned, mistakes..."
+            placeholder="Autre chose — conditions de marché, leçons apprises, erreurs…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="h-20 resize-none"
+            className="h-16 resize-none text-sm"
           />
         </div>
 
         <Button onClick={handleSubmit} disabled={submitting || createEntry.isPending} className="w-full">
           {submitting ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-          Save Entry
+          Enregistrer l'entrée
         </Button>
       </div>
 
       {/* Existing entries */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Journal Log</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Journal</h3>
         {isLoading && <Activity className="h-5 w-5 animate-spin text-accent mx-auto" />}
         {!isLoading && (!entries || entries.length === 0) && (
           <div className="text-center py-8 text-muted-foreground text-sm">
-            No journal entries yet. Record your first entry above.
+            Aucune entrée pour l'instant. Enregistrez votre première réflexion ci-dessus.
           </div>
         )}
         <AnimatePresence>
@@ -220,20 +239,20 @@ function JournalPanel({ position, onClose }: { position: PositionAny; onClose: (
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="border border-border rounded-lg p-3 bg-card/30 space-y-2"
+              className="border border-border rounded-xl p-3 bg-card/30 space-y-2"
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs">{entryTypeLabel[entry.entryType] ?? entry.entryType}</Badge>
+                  <Badge variant="outline" className="text-xs">{ENTRY_TYPE_LABELS[entry.entryType] ?? entry.entryType}</Badge>
                   {entry.emotion && (
                     <span className={`px-2 py-0.5 rounded-full border text-xs font-medium ${EMOTION_COLORS[entry.emotion] ?? "bg-muted"}`}>
-                      {entry.emotion}
+                      {EMOTION_LABELS[entry.emotion] ?? entry.emotion}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground font-mono">
-                    {format(new Date(entry.createdAt), "MMM dd, HH:mm")}
+                    {format(new Date(entry.createdAt), "dd MMM, HH:mm", { locale: fr })}
                   </span>
                   <button
                     type="button"
@@ -246,7 +265,7 @@ function JournalPanel({ position, onClose }: { position: PositionAny; onClose: (
               </div>
               {entry.reasoning && (
                 <div>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase mb-0.5">Reasoning</div>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase mb-0.5">Analyse</div>
                   <p className="text-sm text-foreground/90 leading-relaxed">{entry.reasoning}</p>
                 </div>
               )}
@@ -274,7 +293,8 @@ export default function Portfolio() {
   const [journalPosition, setJournalPosition] = useState<PositionAny | null>(null);
 
   const { data: positions, isLoading: loadingPositions } = useGetPortfolioPositions();
-  const { data: summary, isLoading: loadingSummary } = useGetPortfolioSummary({ query: { refetchInterval: 10000 } });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: summary, isLoading: loadingSummary } = useGetPortfolioSummary({ query: { refetchInterval: 10000 } as any });
   const closeMutation = useClosePosition();
 
   if (loadingPositions || loadingSummary) {
@@ -302,12 +322,12 @@ export default function Portfolio() {
         id: selectedPosition.id,
         data: { closeReason, closePrice: Number(closePrice) },
       });
-      toast({ title: "Position Closed", description: `Closed ${selectedPosition.symbol} at ${closePrice}` });
+      toast({ title: "Position clôturée", description: `${selectedPosition.symbol} clôturé à ${closePrice}` });
       setCloseDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: getGetPortfolioPositionsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetPortfolioSummaryQueryKey() });
     } catch {
-      toast({ variant: "destructive", title: "Error closing position" });
+      toast({ variant: "destructive", title: "Erreur lors de la clôture" });
     }
   };
 
@@ -323,48 +343,48 @@ export default function Portfolio() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* 1. Target Progress Banner */}
       {summary && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card border border-border p-6 rounded-xl shadow-lg relative overflow-hidden"
+          className="bg-card border border-border p-5 md:p-6 rounded-xl shadow-lg relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 -mt-16 -mr-16 text-accent/5 pointer-events-none">
             <Target size={200} />
           </div>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 relative z-10">
             <div className="w-full md:w-1/2">
-              <h2 className="text-muted-foreground text-sm font-medium tracking-widest uppercase mb-1">Campaign Progress</h2>
+              <h2 className="text-muted-foreground text-xs font-medium tracking-widest uppercase mb-1">Progression de l'objectif</h2>
               <div className="flex justify-between items-end mb-2">
-                <span className="font-mono text-xl text-muted-foreground">${summary.startingCapital.toLocaleString()}</span>
-                <span className="font-mono text-4xl font-bold tracking-tight">${summary.currentEquity.toLocaleString()}</span>
-                <span className="font-mono text-xl text-accent">${summary.profitTarget.toLocaleString()}</span>
+                <span className="font-mono text-lg text-muted-foreground">${summary.startingCapital.toLocaleString()}</span>
+                <span className="font-mono text-3xl md:text-4xl font-bold tracking-tight">${summary.currentEquity.toLocaleString()}</span>
+                <span className="font-mono text-lg text-accent">${summary.profitTarget.toLocaleString()}</span>
               </div>
               <Progress value={summary.targetProgress} className="h-3" />
               <div className="flex justify-between mt-2 text-xs font-mono text-muted-foreground">
-                <span>Start</span>
-                <span>Current ({summary.targetProgress.toFixed(1)}%)</span>
-                <span>Target</span>
+                <span>Départ</span>
+                <span>Actuel ({summary.targetProgress.toFixed(1)}%)</span>
+                <span>Objectif</span>
               </div>
             </div>
-            <div className="flex gap-6 md:gap-8">
+            <div className="flex gap-5 md:gap-8 flex-wrap">
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Total P&L</div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">P&L Total</div>
                 <div className={`text-2xl font-bold flex items-center ${summary.totalPnl >= 0 ? "text-accent" : "text-destructive"}`}>
                   {summary.totalPnl >= 0 ? <TrendingUp className="mr-2 h-5 w-5" /> : <TrendingDown className="mr-2 h-5 w-5" />}
                   {summary.totalPnl >= 0 ? "+" : ""}${summary.totalPnl.toLocaleString()}
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Return</div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Rendement</div>
                 <div className={`text-2xl font-bold ${summary.totalPnlPercent >= 0 ? "text-accent" : "text-destructive"}`}>
                   {summary.totalPnlPercent >= 0 ? "+" : ""}{summary.totalPnlPercent.toFixed(2)}%
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Win Rate</div>
+                <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Réussite</div>
                 <div className="text-2xl font-bold text-foreground">{summary.winRate.toFixed(1)}%</div>
               </div>
             </div>
@@ -376,9 +396,9 @@ export default function Portfolio() {
       {summary?.equityCurve && summary.equityCurve.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Equity Curve</CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Courbe d'équité</CardTitle>
           </CardHeader>
-          <CardContent className="h-[260px] p-0 pb-4">
+          <CardContent className="h-[240px] p-0 pb-4">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={summary.equityCurve} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                 <defs>
@@ -387,14 +407,14 @@ export default function Portfolio() {
                     <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="date" tickFormatter={(val) => format(new Date(val), "MMM dd")} stroke="hsl(var(--muted-foreground))" fontSize={12} tickMargin={10} minTickGap={30} />
-                <YAxis domain={["auto", "auto"]} tickFormatter={(val) => `$${val}`} stroke="hsl(var(--muted-foreground))" fontSize={12} tickMargin={10} width={80} />
+                <XAxis dataKey="date" tickFormatter={(val) => format(new Date(val), "dd MMM", { locale: fr })} stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={10} minTickGap={30} />
+                <YAxis domain={["auto", "auto"]} tickFormatter={(val) => `$${val}`} stroke="hsl(var(--muted-foreground))" fontSize={11} tickMargin={10} width={75} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }}
                   itemStyle={{ color: "hsl(var(--foreground))", fontWeight: "bold" }}
                   labelStyle={{ color: "hsl(var(--muted-foreground))", marginBottom: "4px" }}
-                  formatter={(value: number) => [`$${value.toLocaleString()}`, "Equity"]}
-                  labelFormatter={(label) => format(new Date(label), "MMM dd, yyyy")}
+                  formatter={(value: number) => [`$${value.toLocaleString()}`, "Équité"]}
+                  labelFormatter={(label) => format(new Date(label), "dd MMM yyyy", { locale: fr })}
                 />
                 <ReferenceLine y={summary.startingCapital} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
                 <ReferenceLine y={summary.profitTarget} stroke="hsl(var(--accent))" strokeDasharray="3 3" />
@@ -405,45 +425,45 @@ export default function Portfolio() {
         </Card>
       )}
 
-      {/* 3. Performance Stats */}
+      {/* 3. Stats */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-card/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4 text-muted-foreground">
-                <h3 className="font-medium text-sm">Open Positions</h3>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between mb-3 text-muted-foreground">
+                <h3 className="font-medium text-xs">Positions ouvertes</h3>
                 <Briefcase className="h-4 w-4" />
               </div>
-              <div className="text-3xl font-bold">{summary.openPositions}</div>
+              <div className="text-2xl md:text-3xl font-bold">{summary.openPositions}</div>
             </CardContent>
           </Card>
           <Card className="bg-card/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4 text-muted-foreground">
-                <h3 className="font-medium text-sm">Closed Positions</h3>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between mb-3 text-muted-foreground">
+                <h3 className="font-medium text-xs">Positions clôturées</h3>
                 <History className="h-4 w-4" />
               </div>
-              <div className="text-3xl font-bold">{summary.closedPositions}</div>
+              <div className="text-2xl md:text-3xl font-bold">{summary.closedPositions}</div>
             </CardContent>
           </Card>
           <Card className="bg-card/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4 text-muted-foreground">
-                <h3 className="font-medium text-sm">Avg R:R</h3>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between mb-3 text-muted-foreground">
+                <h3 className="font-medium text-xs">R:R moyen</h3>
                 <Crosshair className="h-4 w-4" />
               </div>
-              <div className="text-3xl font-bold">1:{summary.avgRr?.toFixed(2) || "0.00"}</div>
+              <div className="text-2xl md:text-3xl font-bold">1:{summary.avgRr?.toFixed(2) || "0.00"}</div>
             </CardContent>
           </Card>
           <Card className="bg-card/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4 text-muted-foreground">
-                <h3 className="font-medium text-sm">Best / Worst</h3>
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center justify-between mb-3 text-muted-foreground">
+                <h3 className="font-medium text-xs">Meilleur / Pire</h3>
                 <Target className="h-4 w-4" />
               </div>
-              <div className="text-xl font-bold">
+              <div className="text-lg md:text-xl font-bold">
                 <span className="text-accent">${summary.bestTrade?.toFixed(2) || "0.00"}</span>
-                <span className="text-muted-foreground font-normal mx-2">/</span>
+                <span className="text-muted-foreground font-normal mx-1">/</span>
                 <span className="text-destructive">-${Math.abs(summary.worstTrade || 0).toFixed(2)}</span>
               </div>
             </CardContent>
@@ -451,191 +471,203 @@ export default function Portfolio() {
         </div>
       )}
 
-      {/* 4. Open Positions Table */}
+      {/* 4. Open Positions */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Open Positions</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Positions ouvertes</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Entry</TableHead>
-                <TableHead>Stop Loss</TableHead>
-                <TableHead>Targets</TableHead>
-                <TableHead>Risk</TableHead>
-                <TableHead>Open Since</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {openPositions.length > 0 ? (
-                openPositions.map((pos) => (
-                  <TableRow key={pos.id} className={pos.direction === "BUY" ? "border-l-2 border-l-accent" : "border-l-2 border-l-destructive"}>
-                    <TableCell className="font-bold">{pos.symbol}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center text-xs font-bold ${pos.direction === "BUY" ? "text-accent" : "text-destructive"}`}>
-                        {pos.direction === "BUY" ? <ArrowUpRight className="mr-1 h-3 w-3" /> : <ArrowDownRight className="mr-1 h-3 w-3" />}
-                        {pos.direction}
-                      </span>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="text-xs">Actif</TableHead>
+                  <TableHead className="text-xs">Direction</TableHead>
+                  <TableHead className="text-xs">Entrée</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell">Stop</TableHead>
+                  <TableHead className="text-xs hidden md:table-cell">Objectifs</TableHead>
+                  <TableHead className="text-xs">Risque</TableHead>
+                  <TableHead className="text-xs hidden sm:table-cell">Ouvert le</TableHead>
+                  <TableHead className="text-right text-xs">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {openPositions.length > 0 ? (
+                  openPositions.map((pos) => (
+                    <TableRow key={pos.id} className={pos.direction === "BUY" ? "border-l-2 border-l-accent" : "border-l-2 border-l-destructive"}>
+                      <TableCell className="font-bold text-sm">{pos.symbol}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center text-xs font-bold ${pos.direction === "BUY" ? "text-accent" : "text-destructive"}`}>
+                          {pos.direction === "BUY" ? <ArrowUpRight className="mr-1 h-3 w-3" /> : <ArrowDownRight className="mr-1 h-3 w-3" />}
+                          {pos.direction === "BUY" ? "ACHAT" : "VENTE"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{pos.entry}</TableCell>
+                      <TableCell className="font-mono text-sm text-destructive hidden md:table-cell">{pos.stopLoss}</TableCell>
+                      <TableCell className="font-mono text-sm hidden md:table-cell">
+                        <span className="text-accent">{pos.takeProfit1}</span>
+                        {pos.takeProfit2 && <span className="text-muted-foreground"> / {pos.takeProfit2}</span>}
+                        {pos.takeProfit3 && <span className="text-muted-foreground"> / {pos.takeProfit3}</span>}
+                      </TableCell>
+                      <TableCell className="text-sm">{pos.riskPercent}%</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground hidden sm:table-cell">
+                        {format(new Date(pos.openedAt), "dd MMM, HH:mm", { locale: fr })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-foreground gap-1 h-7 px-2"
+                            onClick={() => setJournalPosition(pos)}
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline text-xs">Journal</span>
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => handleCloseClick(pos)}>
+                            Clôturer
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-20 text-center text-muted-foreground text-sm">
+                      Aucune position ouverte. Attendez un signal et cliquez sur "J'ai ouvert ce trade".
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{pos.entry}</TableCell>
-                    <TableCell className="font-mono text-sm text-destructive">{pos.stopLoss}</TableCell>
-                    <TableCell className="font-mono text-sm">
-                      <span className="text-accent">{pos.takeProfit1}</span>
-                      {pos.takeProfit2 && <span className="text-muted-foreground"> / {pos.takeProfit2}</span>}
-                      {pos.takeProfit3 && <span className="text-muted-foreground"> / {pos.takeProfit3}</span>}
-                    </TableCell>
-                    <TableCell>{pos.riskPercent}%</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {format(new Date(pos.openedAt), "MMM dd, HH:mm")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 5. Closed Positions */}
+      {closedPositions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Positions clôturées</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="text-xs">Actif</TableHead>
+                    <TableHead className="text-xs">Direction</TableHead>
+                    <TableHead className="text-xs">Entrée</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">Clôture</TableHead>
+                    <TableHead className="text-xs">P&L</TableHead>
+                    <TableHead className="text-xs">Raison</TableHead>
+                    <TableHead className="text-xs hidden md:table-cell">Date</TableHead>
+                    <TableHead className="text-right text-xs">Journal</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {closedPositions.map((pos) => (
+                    <TableRow key={pos.id}>
+                      <TableCell className="font-bold text-sm">{pos.symbol}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center text-xs font-bold ${pos.direction === "BUY" ? "text-accent" : "text-destructive"}`}>
+                          {pos.direction === "BUY" ? "ACHAT" : "VENTE"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{pos.entry}</TableCell>
+                      <TableCell className="font-mono text-sm hidden sm:table-cell">{pos.closePrice ?? "—"}</TableCell>
+                      <TableCell className={`font-mono text-sm font-semibold ${(pos.realizedPnl ?? 0) >= 0 ? "text-accent" : "text-destructive"}`}>
+                        {pos.realizedPnl != null ? `${pos.realizedPnl >= 0 ? "+" : ""}$${pos.realizedPnl}` : "—"}
+                      </TableCell>
+                      <TableCell>{getReasonBadge(pos.closeReason)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground hidden md:table-cell">
+                        {pos.closedAt ? format(new Date(pos.closedAt), "dd MMM, HH:mm", { locale: fr }) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-muted-foreground hover:text-foreground gap-1.5"
+                          className="text-muted-foreground hover:text-foreground gap-1 h-7 px-2"
                           onClick={() => setJournalPosition(pos)}
                         >
                           <BookOpen className="h-3.5 w-3.5" />
-                          Journal
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleCloseClick(pos)}>
-                          Close
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                    No open positions.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* 5. Closed Positions Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Closed Positions</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead>Direction</TableHead>
-                <TableHead>Entry</TableHead>
-                <TableHead>Close Price</TableHead>
-                <TableHead>P&L</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Closed At</TableHead>
-                <TableHead className="text-right">Journal</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {closedPositions.length > 0 ? (
-                closedPositions.map((pos) => (
-                  <TableRow key={pos.id}>
-                    <TableCell className="font-bold">{pos.symbol}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center text-xs font-bold ${pos.direction === "BUY" ? "text-accent" : "text-destructive"}`}>
-                        {pos.direction === "BUY" ? <ArrowUpRight className="mr-1 h-3 w-3" /> : <ArrowDownRight className="mr-1 h-3 w-3" />}
-                        {pos.direction}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{pos.entry}</TableCell>
-                    <TableCell className="font-mono text-sm">{pos.closePrice}</TableCell>
-                    <TableCell className={`font-mono text-sm font-bold ${pos.realizedPnl && pos.realizedPnl >= 0 ? "text-accent" : "text-destructive"}`}>
-                      {pos.realizedPnl && pos.realizedPnl >= 0 ? "+" : ""}${pos.realizedPnl?.toFixed(2)}
-                    </TableCell>
-                    <TableCell>{getReasonBadge(pos.closeReason)}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {pos.closedAt ? format(new Date(pos.closedAt), "MMM dd, HH:mm") : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground gap-1.5"
-                        onClick={() => setJournalPosition(pos)}
-                      >
-                        <BookOpen className="h-3.5 w-3.5" />
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                    No closed positions.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Close Position Dialog */}
+      {/* Close dialog */}
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Close Position: {selectedPosition?.symbol}</DialogTitle>
-            <DialogDescription>Record the closing details for this position.</DialogDescription>
+            <DialogTitle>Clôturer la position</DialogTitle>
+            <DialogDescription>
+              Saisissez le prix de sortie pour calculer le P&L réalisé.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Close Reason</Label>
-              <RadioGroup value={closeReason} onValueChange={setCloseReason} className="flex gap-4 flex-wrap">
-                {[["MANUAL", "Manual"], ["TP1", "TP1"], ["TP2", "TP2"], ["TP3", "TP3"], ["SL", "Stop Loss"]].map(([val, label], i) => (
-                  <div key={val} className="flex items-center space-x-2">
-                    <RadioGroupItem value={val!} id={`r${i}`} />
-                    <Label htmlFor={`r${i}`}>{label}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
+          {selectedPosition && (
+            <div className="space-y-4 py-2">
+              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold ${selectedPosition.direction === "BUY" ? "bg-accent/10 text-accent" : "bg-destructive/10 text-destructive"}`}>
+                {selectedPosition.direction === "BUY" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                {selectedPosition.symbol} — {selectedPosition.direction === "BUY" ? "ACHAT" : "VENTE"} @ {selectedPosition.entry}
+              </div>
+              <div>
+                <Label htmlFor="closePrice" className="text-sm mb-2 block">Prix de clôture</Label>
+                <Input
+                  id="closePrice"
+                  type="number"
+                  step="any"
+                  value={closePrice}
+                  onChange={(e) => setClosePrice(e.target.value)}
+                  placeholder="Saisissez le prix de sortie"
+                  className="h-11"
+                />
+              </div>
+              <div>
+                <Label className="text-sm mb-2 block">Raison de clôture</Label>
+                <RadioGroup value={closeReason} onValueChange={setCloseReason} className="flex flex-wrap gap-3">
+                  {["TP1", "TP2", "TP3", "SL", "MANUAL"].map((r) => (
+                    <div key={r} className="flex items-center space-x-2">
+                      <RadioGroupItem value={r} id={`reason-${r}`} />
+                      <Label htmlFor={`reason-${r}`} className="text-sm cursor-pointer">{r}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Close Price</Label>
-              <Input type="number" step="any" value={closePrice} onChange={(e) => setClosePrice(e.target.value)} placeholder="e.g. 150.25" />
-            </div>
-          </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCloseSubmit} disabled={!closePrice || closeMutation.isPending}>
-              {closeMutation.isPending ? "Closing..." : "Close Position"}
+            <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Annuler</Button>
+            <Button
+              onClick={handleCloseSubmit}
+              disabled={!closePrice || closeMutation.isPending}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              {closeMutation.isPending ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirmer la clôture
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Journal Sheet */}
+      {/* Journal sheet */}
       <Sheet open={!!journalPosition} onOpenChange={(open) => { if (!open) setJournalPosition(null); }}>
-        <SheetContent className="w-full sm:max-w-lg flex flex-col gap-0 overflow-hidden" side="right">
-          <SheetHeader className="mb-4 shrink-0">
-            <SheetTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-accent" />
-              Trade Journal
-            </SheetTitle>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col">
+          <SheetHeader className="pb-4">
+            <SheetTitle>Journal de trading</SheetTitle>
             <SheetDescription>
-              Record your reasoning, emotions, and notes for this position.
+              Enregistrez vos analyses et émotions pour ce trade.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-hidden">
-            {journalPosition && (
-              <JournalPanel position={journalPosition} onClose={() => setJournalPosition(null)} />
-            )}
-          </div>
+          {journalPosition && (
+            <JournalPanel position={journalPosition} onClose={() => setJournalPosition(null)} />
+          )}
         </SheetContent>
       </Sheet>
     </div>

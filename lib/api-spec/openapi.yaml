@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: account
+    description: Trading account operations
   - name: broker
     description: Broker connection operations
   - name: trading
@@ -24,6 +28,101 @@ tags:
     description: Psychology and performance analytics
 
 paths:
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthInput"
+      responses:
+        "200":
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthInput"
+      responses:
+        "200":
+          description: Logged in successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out current user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+
+  /trading-account:
+    get:
+      operationId: getTradingAccount
+      tags: [account]
+      summary: Get trading account for current user
+      responses:
+        "200":
+          description: Trading account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradingAccount"
+    post:
+      operationId: saveTradingAccount
+      tags: [account]
+      summary: Create or update trading account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradingAccountInput"
+      responses:
+        "200":
+          description: Saved trading account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradingAccount"
+
+
   /healthz:
     get:
       operationId: healthCheck
@@ -360,6 +459,64 @@ paths:
 
 components:
   schemas:
+    AuthInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, email, hasAccount]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        hasAccount:
+          type: boolean
+
+    TradingAccount:
+      type: object
+      required: [id, platformName, accountId, capital, profitTarget, riskLevel, timeframe]
+      properties:
+        id:
+          type: integer
+        platformName:
+          type: string
+        accountId:
+          type: string
+        capital:
+          type: number
+        profitTarget:
+          type: number
+        riskLevel:
+          type: string
+        timeframe:
+          type: string
+
+    TradingAccountInput:
+      type: object
+      required: [platformName, accountId, capital, profitTarget]
+      properties:
+        platformName:
+          type: string
+        accountId:
+          type: string
+        accountPassword:
+          type: ["string", "null"]
+        capital:
+          type: number
+        profitTarget:
+          type: number
+        riskLevel:
+          type: ["string", "null"]
+        timeframe:
+          type: ["string", "null"]
+
     HealthStatus:
       type: object
       properties:

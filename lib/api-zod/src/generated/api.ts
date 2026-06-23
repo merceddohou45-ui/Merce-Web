@@ -9,6 +9,92 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Register with email and password
+ */
+export const RegisterBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const RegisterResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "hasAccount": zod.boolean()
+})
+
+
+/**
+ * @summary Login with email and password
+ */
+export const LoginBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "hasAccount": zod.boolean()
+})
+
+
+/**
+ * @summary Log out current user
+ */
+export const LogoutResponse = zod.object({
+  "status": zod.string()
+})
+
+
+/**
+ * @summary Get current authenticated user
+ */
+export const GetMeResponse = zod.object({
+  "id": zod.number(),
+  "email": zod.string(),
+  "hasAccount": zod.boolean()
+})
+
+
+/**
+ * @summary Get trading account for current user
+ */
+export const GetTradingAccountResponse = zod.object({
+  "id": zod.number(),
+  "platformName": zod.string(),
+  "accountId": zod.string(),
+  "capital": zod.number(),
+  "profitTarget": zod.number(),
+  "riskLevel": zod.string(),
+  "timeframe": zod.string()
+})
+
+
+/**
+ * @summary Create or update trading account
+ */
+export const SaveTradingAccountBody = zod.object({
+  "platformName": zod.string(),
+  "accountId": zod.string(),
+  "accountPassword": zod.string().nullish(),
+  "capital": zod.number(),
+  "profitTarget": zod.number(),
+  "riskLevel": zod.string().nullish(),
+  "timeframe": zod.string().nullish()
+})
+
+export const SaveTradingAccountResponse = zod.object({
+  "id": zod.number(),
+  "platformName": zod.string(),
+  "accountId": zod.string(),
+  "capital": zod.number(),
+  "profitTarget": zod.number(),
+  "riskLevel": zod.string(),
+  "timeframe": zod.string()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

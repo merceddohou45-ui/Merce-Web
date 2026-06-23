@@ -29,14 +29,14 @@ const EMOTION_COLORS: Record<string, string> = {
 };
 
 const EMOTION_LABELS: Record<string, string> = {
-  CONFIDENT: "Confident",
-  DISCIPLINED: "Disciplined",
+  CONFIDENT: "Confiant",
+  DISCIPLINED: "Discipliné",
   PATIENT: "Patient",
-  NEUTRAL: "Neutral",
-  NERVOUS: "Nervous",
+  NEUTRAL: "Neutre",
+  NERVOUS: "Nerveux",
   FOMO: "FOMO",
-  GREEDY: "Greedy",
-  FEARFUL: "Fearful",
+  GREEDY: "Cupide",
+  FEARFUL: "Craintif",
 };
 
 const CARD_EMOTION_STYLES: Record<string, string> = {
@@ -69,8 +69,8 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
       {payload.map((p: any) => (
         <p key={p.name} style={{ color: p.fill ?? p.color }} className="font-mono">
           {p.name}: {p.value ?? "—"}
-          {p.name === "Win Rate" ? "%" : ""}
-          {p.name === "Avg P&L" ? " USD" : ""}
+          {p.name === "Taux de réussite" ? "%" : ""}
+          {p.name === "P&L moy." ? " USD" : ""}
         </p>
       ))}
     </div>
@@ -78,7 +78,8 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Psychology() {
-  const { data, isLoading } = useGetPsychologyAnalytics({ query: { refetchInterval: 30000 } });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, isLoading } = useGetPsychologyAnalytics({ query: { refetchInterval: 30000 } as any });
 
   if (isLoading) {
     return (
@@ -96,12 +97,12 @@ export default function Psychology() {
     .filter((e) => e.winRate !== null)
     .map((e) => ({
       emotion: e.emotion,
-      "Win Rate": e.winRate,
+      "Taux de réussite": e.winRate,
     }));
 
   const frequencyChartData = activeEmotions.map((e) => ({
     emotion: e.emotion,
-    Entries: e.totalEntries,
+    Entrées: e.totalEntries,
   }));
 
   const radarData = allEmotions.map((e) => ({
@@ -110,46 +111,46 @@ export default function Psychology() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-          <Brain className="h-8 w-8 text-accent" />
-          Psychology Analytics
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-3">
+          <Brain className="h-7 w-7 text-accent" />
+          Analyse psychologique
         </h1>
-        <p className="text-muted-foreground mt-1">
-          Understand how your emotional state affects your trading performance.
+        <p className="text-muted-foreground mt-1 text-sm">
+          Comprenez comment votre état émotionnel influence vos performances de trading.
         </p>
       </div>
 
       {/* Summary row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-card/50">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-3 text-muted-foreground">
-              <span className="text-sm">Journal Entries</span>
+              <span className="text-xs">Entrées journal</span>
               <BookOpen className="h-4 w-4" />
             </div>
-            <div className="text-3xl font-bold">{data?.totalEntries ?? 0}</div>
+            <div className="text-2xl md:text-3xl font-bold">{data?.totalEntries ?? 0}</div>
           </CardContent>
         </Card>
         <Card className="bg-card/50">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-3 text-muted-foreground">
-              <span className="text-sm">Positions Journaled</span>
+              <span className="text-xs">Positions journalisées</span>
               <Activity className="h-4 w-4" />
             </div>
-            <div className="text-3xl font-bold">{data?.totalPositionsWithJournal ?? 0}</div>
+            <div className="text-2xl md:text-3xl font-bold">{data?.totalPositionsWithJournal ?? 0}</div>
           </CardContent>
         </Card>
         <Card className="bg-card/50">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-3 text-muted-foreground">
-              <span className="text-sm">Best Emotion</span>
+              <span className="text-xs">Meilleure émotion</span>
               <TrendingUp className="h-4 w-4 text-accent" />
             </div>
             {data?.topWinEmotion ? (
-              <div className={`text-lg font-bold px-2 py-1 rounded-md inline-block border ${CARD_EMOTION_STYLES[data.topWinEmotion] ?? ""}`}>
+              <div className={`text-sm md:text-base font-bold px-2 py-1 rounded-md inline-block border ${CARD_EMOTION_STYLES[data.topWinEmotion] ?? ""}`}>
                 {EMOTION_LABELS[data.topWinEmotion] ?? data.topWinEmotion}
               </div>
             ) : (
@@ -158,13 +159,13 @@ export default function Psychology() {
           </CardContent>
         </Card>
         <Card className="bg-card/50">
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center justify-between mb-3 text-muted-foreground">
-              <span className="text-sm">Worst Emotion</span>
+              <span className="text-xs">Pire émotion</span>
               <TrendingDown className="h-4 w-4 text-destructive" />
             </div>
             {data?.topLossEmotion ? (
-              <div className={`text-lg font-bold px-2 py-1 rounded-md inline-block border ${CARD_EMOTION_STYLES[data.topLossEmotion] ?? ""}`}>
+              <div className={`text-sm md:text-base font-bold px-2 py-1 rounded-md inline-block border ${CARD_EMOTION_STYLES[data.topLossEmotion] ?? ""}`}>
                 {EMOTION_LABELS[data.topLossEmotion] ?? data.topLossEmotion}
               </div>
             ) : (
@@ -178,9 +179,9 @@ export default function Psychology() {
         <Card className="border-dashed">
           <CardContent className="py-16 text-center space-y-3">
             <Brain className="h-12 w-12 text-muted-foreground/30 mx-auto" />
-            <p className="font-semibold text-lg">No journal entries yet</p>
+            <p className="font-semibold text-lg">Aucune entrée dans le journal</p>
             <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-              Open a trade in your Portfolio and add a journal entry with an emotion tag. After a few entries, your behavioral patterns will appear here.
+              Ouvrez un trade dans votre Portefeuille et ajoutez une entrée journal avec un tag émotionnel. Après quelques entrées, vos schémas comportementaux apparaîtront ici.
             </p>
           </CardContent>
         </Card>
@@ -192,7 +193,7 @@ export default function Psychology() {
               <CardHeader>
                 <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
                   <Lightbulb className="h-4 w-4 text-accent" />
-                  Behavioral Insights
+                  Insights comportementaux
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -209,23 +210,22 @@ export default function Psychology() {
           )}
 
           {/* Charts row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Win rate by emotion */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {winRateChartData.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    Win Rate by Emotion
+                    Taux de réussite par émotion
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[280px] p-0 pb-4">
+                <CardContent className="h-[260px] p-0 pb-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={winRateChartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                       <XAxis
                         dataKey="emotion"
                         tickFormatter={(v) => EMOTION_LABELS[v] ?? v}
                         stroke="hsl(var(--muted-foreground))"
-                        fontSize={11}
+                        fontSize={10}
                         tick={{ fill: "hsl(var(--muted-foreground))" }}
                       />
                       <YAxis
@@ -237,7 +237,7 @@ export default function Psychology() {
                         tick={{ fill: "hsl(var(--muted-foreground))" }}
                       />
                       <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted)/0.3)" }} />
-                      <Bar dataKey="Win Rate" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="Taux de réussite" radius={[4, 4, 0, 0]}>
                         {winRateChartData.map((entry) => (
                           <Cell key={entry.emotion} fill={EMOTION_COLORS[entry.emotion] ?? "#6b7280"} />
                         ))}
@@ -248,22 +248,21 @@ export default function Psychology() {
               </Card>
             )}
 
-            {/* Entry frequency */}
             {frequencyChartData.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                    Emotion Frequency
+                    Fréquence des émotions
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[280px] p-0 pb-4">
+                <CardContent className="h-[260px] p-0 pb-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={frequencyChartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
                       <XAxis
                         dataKey="emotion"
                         tickFormatter={(v) => EMOTION_LABELS[v] ?? v}
                         stroke="hsl(var(--muted-foreground))"
-                        fontSize={11}
+                        fontSize={10}
                         tick={{ fill: "hsl(var(--muted-foreground))" }}
                       />
                       <YAxis
@@ -274,7 +273,7 @@ export default function Psychology() {
                         allowDecimals={false}
                       />
                       <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "hsl(var(--muted)/0.3)" }} />
-                      <Bar dataKey="Entries" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="Entrées" radius={[4, 4, 0, 0]}>
                         {frequencyChartData.map((entry) => (
                           <Cell key={entry.emotion} fill={EMOTION_COLORS[entry.emotion] ?? "#6b7280"} opacity={0.75} />
                         ))}
@@ -286,24 +285,23 @@ export default function Psychology() {
             )}
           </div>
 
-          {/* Emotion performance radar (if enough data) */}
           {activeEmotions.filter((e) => e.winRate !== null).length >= 3 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Emotional Performance Radar
+                  Radar de performance émotionnelle
                 </CardTitle>
               </CardHeader>
-              <CardContent className="h-[320px] p-0 pb-4">
+              <CardContent className="h-[300px] p-0 pb-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="hsl(var(--border))" />
                     <PolarAngleAxis
                       dataKey="emotion"
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                     />
                     <Radar
-                      name="Win Rate %"
+                      name="Taux de réussite %"
                       dataKey="score"
                       stroke="hsl(var(--accent))"
                       fill="hsl(var(--accent))"
@@ -311,7 +309,7 @@ export default function Psychology() {
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
-                      formatter={(v: number) => [`${v}%`, "Win Rate"]}
+                      formatter={(v: number) => [`${v}%`, "Taux de réussite"]}
                     />
                   </RadarChart>
                 </ResponsiveContainer>
@@ -319,11 +317,10 @@ export default function Psychology() {
             </Card>
           )}
 
-          {/* Emotion breakdown table */}
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                Emotion Breakdown
+                Détail par émotion
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -336,9 +333,8 @@ export default function Psychology() {
                       : 0;
 
                   return (
-                    <div key={stat.emotion} className="flex items-center gap-4 px-6 py-4">
-                      {/* Emotion label */}
-                      <div className="w-28 shrink-0">
+                    <div key={stat.emotion} className="flex items-center gap-4 px-4 md:px-6 py-4">
+                      <div className="w-24 shrink-0">
                         <span
                           className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${CARD_EMOTION_STYLES[stat.emotion] ?? "border-border text-muted-foreground"}`}
                         >
@@ -346,18 +342,17 @@ export default function Psychology() {
                         </span>
                       </div>
 
-                      {/* Stats */}
                       <div className="flex-1 min-w-0">
                         {stat.totalEntries > 0 ? (
                           <div className="space-y-1.5">
                             <div className="flex justify-between text-xs text-muted-foreground mb-1">
                               <span>
-                                {stat.winCount}W / {stat.lossCount}L
-                                {totalOutcomes === 0 && " (no closed trades yet)"}
+                                {stat.winCount}G / {stat.lossCount}P
+                                {totalOutcomes === 0 && " (aucun trade clôturé)"}
                               </span>
-                              {stat.winRate !== null && (
+                              {stat.winRate != null && (
                                 <span className={stat.winRate >= 50 ? "text-accent" : "text-destructive"}>
-                                  {stat.winRate}% win
+                                  {stat.winRate}% réussite
                                 </span>
                               )}
                             </div>
@@ -369,29 +364,27 @@ export default function Psychology() {
                             )}
                           </div>
                         ) : (
-                          <div className="text-xs text-muted-foreground italic">No entries</div>
+                          <div className="text-xs text-muted-foreground italic">Aucune entrée</div>
                         )}
                       </div>
 
-                      {/* Right side: entries + avg P&L */}
-                      <div className="shrink-0 text-right w-32 space-y-0.5">
+                      <div className="shrink-0 text-right w-28 space-y-0.5">
                         <div className="text-xs text-muted-foreground">
-                          {stat.totalEntries} {stat.totalEntries === 1 ? "entry" : "entries"}
+                          {stat.totalEntries} {stat.totalEntries <= 1 ? "entrée" : "entrées"}
                         </div>
-                        {stat.avgPnl !== null && (
+                        {stat.avgPnl != null && (
                           <div
-                            className={`text-xs font-mono font-semibold ${stat.avgPnl >= 0 ? "text-accent" : "text-destructive"}`}
+                            className={`text-xs font-mono font-semibold ${(stat.avgPnl ?? 0) >= 0 ? "text-accent" : "text-destructive"}`}
                           >
-                            {stat.avgPnl >= 0 ? "+" : ""}${stat.avgPnl} avg
+                            {(stat.avgPnl ?? 0) >= 0 ? "+" : ""}${stat.avgPnl} moy.
                           </div>
                         )}
                       </div>
 
-                      {/* Entry type breakdown placeholder */}
-                      <div className="shrink-0 w-16 text-right">
+                      <div className="shrink-0 w-14 text-right">
                         {stat.totalEntries > 0 && (
                           <Badge variant="outline" className="font-mono text-xs">
-                            {stat.linkedPositions} pos
+                            {stat.linkedPositions} pos.
                           </Badge>
                         )}
                       </div>
@@ -402,20 +395,19 @@ export default function Psychology() {
             </CardContent>
           </Card>
 
-          {/* Entry type breakdown */}
           {data.entryTypeBreakdown && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-                  Journal Entry Types
+                  Types d'entrées journal
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   {[
-                    { key: "open", label: "Open Rationale", color: "text-accent" },
+                    { key: "open", label: "Analyse d'ouverture", color: "text-accent" },
                     { key: "note", label: "Notes", color: "text-blue-400" },
-                    { key: "close", label: "Close Rationale", color: "text-purple-400" },
+                    { key: "close", label: "Analyse de clôture", color: "text-purple-400" },
                   ].map(({ key, label, color }) => (
                     <div key={key} className="space-y-2">
                       <div className={`text-3xl font-bold ${color}`}>

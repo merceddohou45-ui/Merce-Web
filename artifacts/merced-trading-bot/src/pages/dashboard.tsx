@@ -10,8 +10,7 @@ import {
   useGetSignalStats,
   useGetAssets,
   useScanMarkets,
-  useGetProfile,
-  useGetBrokerStatus,
+  useGetTradingAccount,
   useOpenPositionFromSignal,
   getGetPortfolioPositionsQueryKey,
   getGetPortfolioSummaryQueryKey,
@@ -50,19 +49,21 @@ export default function Dashboard() {
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [confirmSignal, setConfirmSignal] = useState<LiveSignal | null>(null);
 
-  const { data: brokerStatus, isLoading: loadingBroker } = useGetBrokerStatus();
-  const { data: profile, isLoading: loadingProfile } = useGetProfile();
-  const { data: stats } = useGetSignalStats({ query: { enabled: !!brokerStatus?.connected } });
-  const { data: assets } = useGetAssets({ query: { enabled: !!brokerStatus?.connected } });
-  const scanMarkets = useScanMarkets({ query: { enabled: false } });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: account, isLoading: loadingAccount } = useGetTradingAccount({ query: { retry: false } as any });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: stats } = useGetSignalStats({ query: { enabled: !!account } as any });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: assets } = useGetAssets({ query: { enabled: !!account } as any });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scanMarkets = useScanMarkets({ query: { enabled: false } as any });
   const openPosition = useOpenPositionFromSignal();
 
   useEffect(() => {
-    if (!loadingBroker && !loadingProfile) {
-      if (!brokerStatus?.connected) setLocation("/connect");
-      else if (!profile?.capital) setLocation("/setup");
+    if (!loadingAccount && !account) {
+      setLocation("/compte-trading");
     }
-  }, [brokerStatus, profile, loadingBroker, loadingProfile, setLocation]);
+  }, [account, loadingAccount, setLocation]);
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -99,8 +100,8 @@ export default function Dashboard() {
     if (!confirmSignal.dbId) {
       toast({
         variant: "destructive",
-        title: "Signal not yet saved",
-        description: "Wait a moment and try again — the signal needs a database ID first.",
+        title: "Signal non encore enregistré",
+        description: "Patientez un instant et réessayez.",
       });
       setConfirmSignal(null);
       return;
@@ -108,13 +109,13 @@ export default function Dashboard() {
     try {
       await openPosition.mutateAsync({ data: { signalId: confirmSignal.dbId } });
       toast({
-        title: "Trade added to portfolio",
-        description: `${confirmSignal.symbol} ${confirmSignal.direction} is now being tracked.`,
+        title: "Trade ajouté au portefeuille",
+        description: `${confirmSignal.symbol} ${confirmSignal.direction === "BUY" ? "ACHAT" : "VENTE"} est maintenant suivi.`,
       });
       queryClient.invalidateQueries({ queryKey: getGetPortfolioPositionsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetPortfolioSummaryQueryKey() });
     } catch {
-      toast({ variant: "destructive", title: "Could not add trade", description: "Please try again." });
+      toast({ variant: "destructive", title: "Impossible d'ajouter le trade", description: "Veuillez réessayer." });
     } finally {
       setConfirmSignal(null);
     }
@@ -126,7 +127,7 @@ export default function Dashboard() {
     return "bg-destructive text-destructive-foreground";
   };
 
-  if (loadingBroker || loadingProfile || !brokerStatus?.connected) {
+  if (loadingAccount || !account) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
         <Activity className="h-8 w-8 text-accent animate-spin" />
@@ -135,97 +136,100 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">War Room</h1>
-          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Tableau de bord</h1>
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${isWsConnected ? "bg-accent animate-pulse" : "bg-destructive"}`} />
-              {isWsConnected ? "LIVE FEED CONNECTED" : "FEED DISCONNECTED"}
+              {isWsConnected ? "FLUX EN DIRECT" : "FLUX DÉCONNECTÉ"}
             </span>
             <span>•</span>
-            <span>{brokerStatus.broker}</span>
-            {brokerStatus.accountId && (
-              <>
-                <span>•</span>
-                <span className="font-mono">{brokerStatus.accountId}</span>
-              </>
-            )}
+            <span className="font-mono">{account.platformName}</span>
+            <span>•</span>
+            <span className="font-mono">{account.accountId}</span>
           </div>
         </div>
-        <Button variant="outline" onClick={handleManualScan} disabled={scanMarkets.isFetching}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManualScan}
+          disabled={scanMarkets.isFetching}
+          className="shrink-0"
+        >
           {scanMarkets.isFetching
             ? <Activity className="mr-2 h-4 w-4 animate-spin" />
             : <Crosshair className="mr-2 h-4 w-4" />}
-          Scan Markets
+          Analyser les marchés
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="bg-card/50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-sm text-muted-foreground">Win Rate</h3>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-xs text-muted-foreground">Taux de réussite</h3>
               <Target className="h-4 w-4 text-accent" />
             </div>
-            <div className="text-3xl font-bold">{stats?.winRate ? `${stats.winRate}%` : "--"}</div>
+            <div className="text-2xl md:text-3xl font-bold">{stats?.winRate ? `${stats.winRate}%` : "--"}</div>
             <Progress value={stats?.winRate || 0} className="h-1 mt-3" />
           </CardContent>
         </Card>
         <Card className="bg-card/50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-sm text-muted-foreground">Est. Profit</h3>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-xs text-muted-foreground">Profit estimé</h3>
               <TrendingUp className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="text-3xl font-bold text-blue-500">${stats?.estimatedProfit?.toFixed(2) || "0.00"}</div>
-            <div className="text-xs text-muted-foreground mt-2">Current session</div>
+            <div className="text-2xl md:text-3xl font-bold text-blue-500">${stats?.estimatedProfit?.toFixed(2) || "0.00"}</div>
+            <div className="text-xs text-muted-foreground mt-2">Session en cours</div>
           </CardContent>
         </Card>
         <Card className="bg-card/50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-sm text-muted-foreground">Active Signals</h3>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-xs text-muted-foreground">Signaux actifs</h3>
               <Activity className="h-4 w-4 text-purple-500" />
             </div>
-            <div className="text-3xl font-bold">{stats?.activeSignals || 0}</div>
-            <div className="text-xs text-muted-foreground mt-2">Out of {stats?.totalSignals || 0} total</div>
+            <div className="text-2xl md:text-3xl font-bold">{stats?.activeSignals || 0}</div>
+            <div className="text-xs text-muted-foreground mt-2">Sur {stats?.totalSignals || 0} au total</div>
           </CardContent>
         </Card>
         <Card className="bg-card/50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-sm text-muted-foreground">Avg Confidence</h3>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-xs text-muted-foreground">Confiance moy.</h3>
               <BarChart3 className="h-4 w-4 text-yellow-500" />
             </div>
-            <div className="text-3xl font-bold">{stats?.avgConfidence ? `${stats.avgConfidence.toFixed(1)}%` : "--"}</div>
+            <div className="text-2xl md:text-3xl font-bold">{stats?.avgConfidence ? `${stats.avgConfidence.toFixed(1)}%` : "--"}</div>
             <Progress value={stats?.avgConfidence || 0} className="h-1 mt-3" />
           </CardContent>
         </Card>
       </div>
 
       {/* Feed + Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2">
           <Card className="border-card-border overflow-hidden">
-            <CardHeader className="border-b border-border bg-muted/20">
-              <CardTitle className="text-sm font-medium flex justify-between">
-                <span>Live Intelligence Feed</span>
-                <span className="text-muted-foreground font-mono font-normal">
-                  T-{new Date().toISOString().split("T")[1]?.substring(0, 8)}
+            <CardHeader className="border-b border-border bg-muted/20 py-3 px-4">
+              <CardTitle className="text-sm font-medium flex justify-between items-center">
+                <span>Flux de signaux en direct</span>
+                <span className="text-muted-foreground font-mono font-normal text-xs">
+                  {new Date().toISOString().split("T")[1]?.substring(0, 8)}
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 min-h-[400px]">
-              <div className="p-4 flex flex-col gap-3">
+              <div className="p-3 flex flex-col gap-2.5">
                 <AnimatePresence initial={false}>
                   {liveSignals.length === 0 ? (
                     <div className="text-center p-8 text-muted-foreground">
                       <Activity className="h-8 w-8 mx-auto mb-3 opacity-20" />
-                      <p>Waiting for high-probability setups...</p>
+                      <p className="text-sm">En attente de setups haute probabilité…</p>
+                      <p className="text-xs mt-1 opacity-60">Les signaux apparaissent quand ≥4 conditions techniques sont réunies</p>
                     </div>
                   ) : (
                     liveSignals.map((signal, idx) => {
@@ -235,16 +239,16 @@ export default function Dashboard() {
                           key={`${signal.symbol}-${signal.generatedAt ?? ""}-${idx}`}
                           initial={{ opacity: 0, y: -20, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          className={`p-4 rounded-lg border ${isBuy ? "border-accent/30 bg-accent/5" : "border-destructive/30 bg-destructive/5"}`}
+                          className={`p-3 md:p-4 rounded-xl border ${isBuy ? "border-accent/30 bg-accent/5" : "border-destructive/30 bg-destructive/5"}`}
                         >
                           {/* Header row */}
                           <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-3">
-                              <Badge className={`${isBuy ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"} font-bold`}>
-                                {isBuy ? <ArrowUpRight className="mr-1 h-3 w-3" /> : <ArrowDownRight className="mr-1 h-3 w-3" />}
-                                {signal.direction}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className={`${isBuy ? "bg-accent text-accent-foreground" : "bg-destructive text-destructive-foreground"} font-bold text-sm px-3`}>
+                                {isBuy ? <ArrowUpRight className="mr-1 h-3.5 w-3.5" /> : <ArrowDownRight className="mr-1 h-3.5 w-3.5" />}
+                                {isBuy ? "ACHAT" : "VENTE"}
                               </Badge>
-                              <span className="font-bold text-lg tracking-tight">{signal.symbol}</span>
+                              <span className="font-bold text-base tracking-tight">{signal.symbol}</span>
                               <Badge variant="outline" className="font-mono text-xs">{signal.timeframe}</Badge>
                             </div>
                             <Badge className={getConfidenceColor(signal.confidence)}>
@@ -253,9 +257,9 @@ export default function Dashboard() {
                           </div>
 
                           {/* Price grid */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                             <div>
-                              <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Entry</div>
+                              <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Entrée</div>
                               <div className="font-mono font-medium">{signal.entry}</div>
                             </div>
                             <div>
@@ -266,13 +270,13 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
-                                <Target className="h-3 w-3" /> Target 1
+                                <Target className="h-3 w-3" /> Objectif 1
                               </div>
                               <div className="font-mono font-medium text-accent">{signal.takeProfit1}</div>
                             </div>
                             <div>
                               <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
-                                <AlertTriangle className="h-3 w-3" /> Risk
+                                <AlertTriangle className="h-3 w-3" /> Risque
                               </div>
                               <div className="font-mono font-medium">{signal.riskPercent}%</div>
                             </div>
@@ -281,7 +285,7 @@ export default function Dashboard() {
                           {/* Rationale */}
                           {signal.reason && (
                             <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-                              <span className="font-semibold text-foreground/70 mr-1">RATIONALE:</span>
+                              <span className="font-semibold text-foreground/70 mr-1">ANALYSE :</span>
                               {signal.reason}
                             </div>
                           )}
@@ -291,11 +295,11 @@ export default function Dashboard() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-xs gap-1.5 border-accent/40 text-accent hover:bg-accent/10 hover:text-accent"
+                              className="text-xs gap-1.5 border-accent/40 text-accent hover:bg-accent/10 hover:text-accent h-8"
                               onClick={() => setConfirmSignal(signal)}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
-                              I opened this trade
+                              J'ai ouvert ce trade
                             </Button>
                           </div>
                         </motion.div>
@@ -309,36 +313,36 @@ export default function Dashboard() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-5">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Market Overview</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Aperçu du marché</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {assets?.slice(0, 8).map((asset) => (
                   <div key={asset.symbol} className="flex justify-between items-center">
                     <div>
-                      <div className="font-medium">{asset.symbol}</div>
+                      <div className="font-medium text-sm">{asset.symbol}</div>
                       <div className="text-xs text-muted-foreground">{asset.type}</div>
                     </div>
-                    <div className="text-right font-mono text-sm text-muted-foreground">
-                      {asset.spread ? `Spr: ${asset.spread}` : ""}
+                    <div className="text-right font-mono text-xs text-muted-foreground">
+                      {asset.spread ? `Spread: ${asset.spread}` : ""}
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-6 text-xs text-muted-foreground p-3 bg-secondary rounded-md">
-                These are official trading symbols provided by your connected broker.
+              <div className="mt-4 text-xs text-muted-foreground p-3 bg-secondary rounded-lg">
+                Actifs officiels de votre plateforme de trading.
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Equity Curve (Est)</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Courbe d'équité (estimée)</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 pb-4 h-[200px]">
+            <CardContent className="p-0 pb-4 h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={mockEquityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
@@ -363,9 +367,9 @@ export default function Dashboard() {
       <Dialog open={!!confirmSignal} onOpenChange={(open) => { if (!open) setConfirmSignal(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm trade entry</DialogTitle>
+            <DialogTitle>Confirmer l'ouverture du trade</DialogTitle>
             <DialogDescription>
-              This adds the position to your portfolio tracker so you can record the outcome when you close it in your broker.
+              Cette action ajoute la position à votre portefeuille pour que vous puissiez enregistrer le résultat à la fermeture.
             </DialogDescription>
           </DialogHeader>
 
@@ -375,11 +379,11 @@ export default function Dashboard() {
                 {confirmSignal.direction === "BUY"
                   ? <ArrowUpRight className="h-4 w-4" />
                   : <ArrowDownRight className="h-4 w-4" />}
-                {confirmSignal.symbol} — {confirmSignal.direction}
+                {confirmSignal.symbol} — {confirmSignal.direction === "BUY" ? "ACHAT" : "VENTE"}
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="bg-muted/50 rounded p-3">
-                  <div className="text-muted-foreground text-xs mb-1">Entry</div>
+                  <div className="text-muted-foreground text-xs mb-1">Entrée</div>
                   <div className="font-mono font-semibold">{confirmSignal.entry}</div>
                 </div>
                 <div className="bg-muted/50 rounded p-3">
@@ -387,18 +391,18 @@ export default function Dashboard() {
                   <div className="font-mono font-semibold text-destructive">{confirmSignal.stopLoss}</div>
                 </div>
                 <div className="bg-muted/50 rounded p-3">
-                  <div className="text-muted-foreground text-xs mb-1">Target 1</div>
+                  <div className="text-muted-foreground text-xs mb-1">Objectif 1</div>
                   <div className="font-mono font-semibold text-accent">{confirmSignal.takeProfit1}</div>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Lot size and P&L will be calculated from your risk profile ({confirmSignal.riskPercent}% risk).
+                La taille de position et le P&L seront calculés selon votre profil de risque ({confirmSignal.riskPercent}% de risque).
               </p>
             </div>
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmSignal(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setConfirmSignal(null)}>Annuler</Button>
             <Button
               onClick={handleOpenedTrade}
               disabled={openPosition.isPending}
@@ -407,7 +411,7 @@ export default function Dashboard() {
               {openPosition.isPending
                 ? <Activity className="mr-2 h-4 w-4 animate-spin" />
                 : <CheckCircle2 className="mr-2 h-4 w-4" />}
-              Yes, I opened this trade
+              Oui, j'ai ouvert ce trade
             </Button>
           </DialogFooter>
         </DialogContent>
