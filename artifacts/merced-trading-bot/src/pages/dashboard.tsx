@@ -4,8 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity, ArrowUpRight, ArrowDownRight, Target,
   TrendingUp, BarChart3, AlertTriangle,
-  Crosshair, Shield, CheckCircle2, Clock,
+  Crosshair, Shield, CheckCircle2, Clock, Bell, BellOff,
 } from "lucide-react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import {
   useGetSignalStats,
   useGetAssets,
@@ -76,6 +77,7 @@ export default function Dashboard() {
   const scanMarkets = useScanMarkets({ query: { enabled: false } as any });
   const openPosition = useOpenPositionFromSignal();
   const equityData = useEquityData(account);
+  const { state: pushState, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
 
   useEffect(() => {
     if (!loadingAccount && !account) {
@@ -200,18 +202,39 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleManualScan}
-          disabled={scanMarkets.isFetching}
-          className="shrink-0"
-        >
-          {scanMarkets.isFetching
-            ? <Activity className="mr-2 h-4 w-4 animate-spin" />
-            : <Crosshair className="mr-2 h-4 w-4" />}
-          Analyser les marchés
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Push notification toggle */}
+          {pushState !== "unsupported" && pushState !== "denied" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pushState === "granted" ? unsubscribePush() : subscribePush()}
+              disabled={pushState === "loading"}
+              title={pushState === "granted" ? "Désactiver les alertes" : "Activer les alertes signal"}
+              className={pushState === "granted" ? "border-accent/50 text-accent" : ""}
+            >
+              {pushState === "loading"
+                ? <Activity className="h-4 w-4 animate-spin" />
+                : pushState === "granted"
+                ? <Bell className="h-4 w-4" />
+                : <BellOff className="h-4 w-4" />}
+              <span className="hidden sm:inline ml-2">
+                {pushState === "granted" ? "Alertes actives" : "Alertes"}
+              </span>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualScan}
+            disabled={scanMarkets.isFetching}
+          >
+            {scanMarkets.isFetching
+              ? <Activity className="mr-2 h-4 w-4 animate-spin" />
+              : <Crosshair className="mr-2 h-4 w-4" />}
+            Analyser les marchés
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

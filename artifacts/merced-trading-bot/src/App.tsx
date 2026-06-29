@@ -12,6 +12,7 @@ import Signals from "@/pages/signals";
 import Portfolio from "@/pages/portfolio";
 import Psychology from "@/pages/psychology";
 import { Layout } from "@/components/layout";
+import { PWAInstallModal } from "@/components/pwa-install-modal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,7 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "")}>
           <Router />
+          <PWAInstallModal />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

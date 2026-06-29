@@ -37,3 +37,6 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
+VAPID_PUBLIC_KEY = "BLId4GLPzuvEzQBfgn_RGAllsrakLGGL5IPdd9CQOQzrrVGMT2rtSDVHlGznG4L0xIqtjlk_FTWr_2-5byCGTD8"
+VAPID_PRIVATE_KEY = "EJyuE_EI401H-QEzbxD4mzk-XMuslij41mEd86YA6n0"
+VAPID_CONTACT = "mailto:admin@merced.io"

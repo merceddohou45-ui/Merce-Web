@@ -6,6 +6,7 @@ import { generateSignals } from "./lib/marketEngine";
 import { db, tradingAccountTable, signalHistoryTable, portfolioPositionTable } from "@workspace/db";
 import { pool } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
+import { sendPushNotification } from "./routes/push";
 
 const rawPort = process.env["PORT"];
 if (!rawPort) throw new Error("PORT environment variable is required but was not provided.");
@@ -118,6 +119,15 @@ async function autoScan(): Promise<void> {
 
     broadcast({ type: "signal", data: { ...selected, dbId: saved!.id } });
     logger.info({ symbol: selected.symbol, direction: selected.direction }, "Signal diffusé");
+
+    // Push notification to all subscribed devices
+    const dirLabel = selected.direction === "BUY" ? "📈 ACHAT" : "📉 VENTE";
+    sendPushNotification({
+      title: `${dirLabel} — ${selected.symbol}`,
+      body: `Entrée: ${selected.entry.toFixed(5)} | Confiance: ${selected.confidence}% | TF: ${selected.timeframe}`,
+      tag: `signal-${selected.symbol}`,
+      url: "/dashboard",
+    }).catch(() => { /* ignore push errors */ });
   } catch (err) {
     logger.error({ err }, "Erreur scan automatique");
   }

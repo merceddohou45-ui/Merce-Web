@@ -9,6 +9,7 @@ import { journalRouter } from "./journal";
 import { analyticsRouter } from "./analytics";
 import { authRouter } from "./auth";
 import { tradingAccountRouter } from "./tradingAccount";
+import { pushRouter } from "./push";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(signalsRouter);
 router.use(portfolioRouter);
 router.use(journalRouter);
 router.use(analyticsRouter);
+router.use(pushRouter);
 
 export default router;

@@ -4,7 +4,6 @@ import { Activity, LayoutDashboard, History, Settings, LogOut, PieChart, Brain }
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { PWAInstallButton } from "@/components/pwa-install";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -63,10 +62,6 @@ export function Layout({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-
-        <div className="pb-2">
-          <PWAInstallButton />
-        </div>
 
         <div className="p-4 border-t border-border">
           <Button
