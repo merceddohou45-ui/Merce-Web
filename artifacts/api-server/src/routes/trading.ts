@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { db, brokerSessionTable, signalHistoryTable } from "@workspace/db";
+import { db, brokerSessionTable, signalHistoryTable, tradingAccountTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import {
   GetAssetsResponse,
   ScanMarketsResponse,
 } from "@workspace/api-zod";
 import { getBrokerAssets, generateSignals } from "../lib/marketEngine";
+import { fetchBatchPrices } from "../lib/twelveData";
 
 const router: IRouter = Router();
 
@@ -20,10 +21,33 @@ router.get("/assets", async (req, res): Promise<void> => {
   const broker = session?.broker ?? "default";
   const assets = getBrokerAssets(broker);
 
-  res.json(GetAssetsResponse.parse(assets));
+  // Validate base assets structure
+  const validated = GetAssetsResponse.parse(assets);
+
+  // Enrich with live prices (outside Zod schema, for display only)
+  const symbols = validated.map((a) => a.symbol);
+  const prices = await fetchBatchPrices(symbols);
+
+  const enriched = validated.map((a) => ({
+    ...a,
+    livePrice: prices[a.symbol] ?? null,
+  }));
+
+  res.json(enriched);
 });
 
 router.get("/scan", async (req, res): Promise<void> => {
+  if (!req.session.userId) {
+    res.status(401).json({ error: "Non authentifié." });
+    return;
+  }
+
+  const [account] = await db
+    .select()
+    .from(tradingAccountTable)
+    .where(eq(tradingAccountTable.userId, req.session.userId))
+    .limit(1);
+
   const [session] = await db
     .select()
     .from(brokerSessionTable)
@@ -31,22 +55,13 @@ router.get("/scan", async (req, res): Promise<void> => {
     .orderBy(desc(brokerSessionTable.connectedAt))
     .limit(1);
 
-  const broker = session?.broker ?? "default";
+  const broker = session?.broker ?? account?.platformName ?? "default";
+  const riskLevel = (account?.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
+  const timeframe = account?.timeframe ?? "H1";
+  const capital = account ? parseFloat(account.capital) : 1000;
 
-  // Get user's risk/timeframe from the most recent profile
-  const { tradingProfileTable } = await import("@workspace/db");
-  const [profile] = await db
-    .select()
-    .from(tradingProfileTable)
-    .orderBy(desc(tradingProfileTable.createdAt))
-    .limit(1);
+  const signals = await generateSignals(broker, riskLevel, timeframe, capital);
 
-  const riskLevel = (profile?.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
-  const timeframe = profile?.timeframe ?? "M5";
-
-  const signals = generateSignals(broker, riskLevel, timeframe);
-
-  // Save signals to history
   if (signals.length > 0) {
     await db.insert(signalHistoryTable).values(
       signals.map((s) => ({
@@ -66,8 +81,7 @@ router.get("/scan", async (req, res): Promise<void> => {
     );
   }
 
-  req.log.info({ broker, count: signals.length }, "Market scan complete");
-
+  req.log.info({ broker, count: signals.length }, "Scan marché terminé");
   res.json(ScanMarketsResponse.parse(signals));
 });
 

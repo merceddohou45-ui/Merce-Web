@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity, ArrowUpRight, ArrowDownRight, Target,
   TrendingUp, BarChart3, AlertTriangle,
-  Crosshair, Shield, CheckCircle2
+  Crosshair, Shield, CheckCircle2, Clock,
 } from "lucide-react";
 import {
   useGetSignalStats,
@@ -29,16 +29,35 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, Tooltip, XAxis } from "recharts";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
-const mockEquityData = Array.from({ length: 20 }, (_, i) => ({
-  time: i,
-  value: 1000 + Math.random() * 200 + i * 15,
-}));
-
 type LiveSignal = Signal & { dbId?: number };
+
+function useEquityData(account: { capital?: number } | undefined) {
+  const [equityData, setEquityData] = useState<{ time: string; value: number }[]>([]);
+  const { data: stats } = useGetSignalStats();
+
+  useEffect(() => {
+    if (!account?.capital) return;
+    const capital = Number(account.capital);
+    const estimatedProfit = stats?.estimatedProfit ?? 0;
+    const now = Date.now();
+    const points = Array.from({ length: 12 }, (_, i) => {
+      const fraction = i / 11;
+      const value = capital + estimatedProfit * fraction;
+      const d = new Date(now - (11 - i) * 60 * 60 * 1000);
+      return {
+        time: `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`,
+        value: parseFloat(value.toFixed(2)),
+      };
+    });
+    setEquityData(points);
+  }, [account?.capital, stats?.estimatedProfit]);
+
+  return equityData;
+}
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -48,16 +67,15 @@ export default function Dashboard() {
   const [liveSignals, setLiveSignals] = useState<LiveSignal[]>([]);
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [confirmSignal, setConfirmSignal] = useState<LiveSignal | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: account, isLoading: loadingAccount } = useGetTradingAccount({ query: { retry: false } as any });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: stats } = useGetSignalStats({ query: { enabled: !!account } as any });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: assets } = useGetAssets({ query: { enabled: !!account } as any });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scanMarkets = useScanMarkets({ query: { enabled: false } as any });
   const openPosition = useOpenPositionFromSignal();
+  const equityData = useEquityData(account);
 
   useEffect(() => {
     if (!loadingAccount && !account) {
@@ -66,31 +84,52 @@ export default function Dashboard() {
   }, [account, loadingAccount, setLocation]);
 
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws/live-signals`;
-    const ws = new WebSocket(wsUrl);
+    function connect() {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/live-signals`;
 
-    ws.onopen = () => setIsWsConnected(true);
-    ws.onclose = () => setIsWsConnected(false);
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data as string) as { type: string; data?: LiveSignal };
-        if (msg.type === "signal" && msg.data) {
-          setLiveSignals((prev) => [msg.data!, ...prev].slice(0, 10));
+      ws.onopen = () => {
+        setIsWsConnected(true);
+      };
+
+      ws.onclose = () => {
+        setIsWsConnected(false);
+        // Reconnect after 5s
+        setTimeout(connect, 5000);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data as string) as { type: string; data?: LiveSignal };
+          if (msg.type === "signal" && msg.data) {
+            setLiveSignals((prev) => [msg.data!, ...prev].slice(0, 10));
+            setLastUpdate(new Date());
+          }
+        } catch {
+          /* ignore malformed */
         }
-      } catch {
-        // ignore malformed messages
-      }
-    };
+      };
+    }
 
-    return () => ws.close();
+    connect();
+
+    return () => {
+      wsRef.current?.close();
+    };
   }, []);
 
   const handleManualScan = () => {
     scanMarkets.refetch().then((res) => {
       if (res.data && res.data.length > 0) {
         setLiveSignals((prev) => [...(res.data as LiveSignal[]), ...prev].slice(0, 10));
+        setLastUpdate(new Date());
       }
     });
   };
@@ -100,7 +139,7 @@ export default function Dashboard() {
     if (!confirmSignal.dbId) {
       toast({
         variant: "destructive",
-        title: "Signal non encore enregistré",
+        title: "Signal non enregistré",
         description: "Patientez un instant et réessayez.",
       });
       setConfirmSignal(null);
@@ -115,7 +154,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: getGetPortfolioPositionsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetPortfolioSummaryQueryKey() });
     } catch {
-      toast({ variant: "destructive", title: "Impossible d'ajouter le trade", description: "Veuillez réessayer." });
+      toast({ variant: "destructive", title: "Erreur", description: "Impossible d'ajouter le trade." });
     } finally {
       setConfirmSignal(null);
     }
@@ -144,12 +183,21 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1.5">
               <span className={`h-2 w-2 rounded-full ${isWsConnected ? "bg-accent animate-pulse" : "bg-destructive"}`} />
-              {isWsConnected ? "FLUX EN DIRECT" : "FLUX DÉCONNECTÉ"}
+              {isWsConnected ? "FLUX EN DIRECT" : "RECONNEXION…"}
             </span>
             <span>•</span>
             <span className="font-mono">{account.platformName}</span>
             <span>•</span>
             <span className="font-mono">{account.accountId}</span>
+            {lastUpdate && (
+              <>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Màj {lastUpdate.toLocaleTimeString("fr-FR")}
+                </span>
+              </>
+            )}
           </div>
         </div>
         <Button
@@ -184,7 +232,11 @@ export default function Dashboard() {
               <h3 className="font-medium text-xs text-muted-foreground">Profit estimé</h3>
               <TrendingUp className="h-4 w-4 text-blue-500" />
             </div>
-            <div className="text-2xl md:text-3xl font-bold text-blue-500">${stats?.estimatedProfit?.toFixed(2) || "0.00"}</div>
+            <div className={`text-2xl md:text-3xl font-bold ${(stats?.estimatedProfit ?? 0) >= 0 ? "text-accent" : "text-destructive"}`}>
+              {stats?.estimatedProfit !== undefined
+                ? `${stats.estimatedProfit >= 0 ? "+" : ""}$${stats.estimatedProfit.toFixed(2)}`
+                : "$0.00"}
+            </div>
             <div className="text-xs text-muted-foreground mt-2">Session en cours</div>
           </CardContent>
         </Card>
@@ -218,7 +270,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium flex justify-between items-center">
                 <span>Flux de signaux en direct</span>
                 <span className="text-muted-foreground font-mono font-normal text-xs">
-                  {new Date().toISOString().split("T")[1]?.substring(0, 8)}
+                  {new Date().toISOString().split("T")[1]?.substring(0, 8)} UTC
                 </span>
               </CardTitle>
             </CardHeader>
@@ -230,10 +282,12 @@ export default function Dashboard() {
                       <Activity className="h-8 w-8 mx-auto mb-3 opacity-20" />
                       <p className="text-sm">En attente de setups haute probabilité…</p>
                       <p className="text-xs mt-1 opacity-60">Les signaux apparaissent quand ≥4 conditions techniques sont réunies</p>
+                      <p className="text-xs mt-1 opacity-60">Analyse automatique toutes les 30 secondes via Twelve Data</p>
                     </div>
                   ) : (
                     liveSignals.map((signal, idx) => {
                       const isBuy = signal.direction === "BUY";
+                      const analysis = (signal as any).analysisDetails;
                       return (
                         <motion.div
                           key={`${signal.symbol}-${signal.generatedAt ?? ""}-${idx}`}
@@ -257,24 +311,28 @@ export default function Dashboard() {
                           </div>
 
                           {/* Price grid */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            <div>
-                              <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Entrée</div>
-                              <div className="font-mono font-medium">{signal.entry}</div>
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                            <div className="bg-background/50 rounded-lg p-2">
+                              <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Entrée live</div>
+                              <div className="font-mono font-bold text-foreground">{signal.entry}</div>
                             </div>
-                            <div>
+                            <div className="bg-background/50 rounded-lg p-2">
                               <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
                                 <Shield className="h-3 w-3" /> Stop
                               </div>
                               <div className="font-mono font-medium text-destructive">{signal.stopLoss}</div>
                             </div>
-                            <div>
+                            <div className="bg-background/50 rounded-lg p-2">
                               <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
-                                <Target className="h-3 w-3" /> Objectif 1
+                                <Target className="h-3 w-3" /> TP1
                               </div>
                               <div className="font-mono font-medium text-accent">{signal.takeProfit1}</div>
                             </div>
-                            <div>
+                            <div className="bg-background/50 rounded-lg p-2">
+                              <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1">TP2</div>
+                              <div className="font-mono font-medium text-accent/80">{signal.takeProfit2}</div>
+                            </div>
+                            <div className="bg-background/50 rounded-lg p-2">
                               <div className="text-muted-foreground text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
                                 <AlertTriangle className="h-3 w-3" /> Risque
                               </div>
@@ -282,15 +340,27 @@ export default function Dashboard() {
                             </div>
                           </div>
 
+                          {/* Analysis details */}
+                          {analysis && (
+                            <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                              <div>RSI: <span className="font-mono text-foreground">{analysis.rsi}</span></div>
+                              <div>EMA20: <span className="font-mono text-foreground">{analysis.ema20}</span></div>
+                              <div>EMA50: <span className="font-mono text-foreground">{analysis.ema50}</span></div>
+                              <div>Support: <span className="font-mono text-foreground">{analysis.supportLevel}</span></div>
+                              <div>Résistance: <span className="font-mono text-foreground">{analysis.resistanceLevel}</span></div>
+                              <div>Tendance: <span className={`font-mono ${analysis.trendDirection === "HAUSSE" ? "text-accent" : analysis.trendDirection === "BAISSE" ? "text-destructive" : "text-foreground"}`}>{analysis.trendDirection}</span></div>
+                            </div>
+                          )}
+
                           {/* Rationale */}
                           {signal.reason && (
-                            <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
+                            <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
                               <span className="font-semibold text-foreground/70 mr-1">ANALYSE :</span>
                               {signal.reason}
                             </div>
                           )}
 
-                          {/* Manual trade confirmation */}
+                          {/* Confirm button */}
                           <div className="mt-3 pt-3 border-t border-border/30 flex justify-end">
                             <Button
                               size="sm"
@@ -314,9 +384,13 @@ export default function Dashboard() {
 
         {/* Sidebar */}
         <div className="space-y-5">
+          {/* Live prices */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Aperçu du marché</CardTitle>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                Prix live
+                <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -326,38 +400,82 @@ export default function Dashboard() {
                       <div className="font-medium text-sm">{asset.symbol}</div>
                       <div className="text-xs text-muted-foreground">{asset.type}</div>
                     </div>
-                    <div className="text-right font-mono text-xs text-muted-foreground">
-                      {asset.spread ? `Spread: ${asset.spread}` : ""}
+                    <div className="text-right font-mono text-sm font-semibold">
+                      {(asset as any).livePrice
+                        ? Number((asset as any).livePrice).toLocaleString("fr-FR", { maximumFractionDigits: 5 })
+                        : <span className="text-muted-foreground text-xs">—</span>}
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 text-xs text-muted-foreground p-3 bg-secondary rounded-lg">
-                Actifs officiels de votre plateforme de trading.
-              </div>
+              {assets && (assets as any[])[0]?.livePrice ? (
+                <div className="mt-3 text-xs text-accent p-2 bg-accent/5 rounded-lg border border-accent/20">
+                  ✅ Prix réels depuis Twelve Data
+                </div>
+              ) : (
+                <div className="mt-3 text-xs text-muted-foreground p-2 bg-muted/50 rounded-lg">
+                  Actifs de votre plateforme de trading
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Equity curve */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Courbe d'équité (estimée)</CardTitle>
+              <CardTitle className="text-sm font-medium">Courbe d'équité</CardTitle>
             </CardHeader>
             <CardContent className="p-0 pb-4 h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockEquityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
-                    itemStyle={{ color: "hsl(var(--foreground))" }}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="hsl(var(--accent))" fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              {equityData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={equityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="time" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", fontSize: 11 }}
+                      itemStyle={{ color: "hsl(var(--foreground))" }}
+                      formatter={(v: number) => [`$${v.toFixed(2)}`, "Capital"]}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="hsl(var(--accent))" fillOpacity={1} fill="url(#colorValue)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                  Données insuffisantes
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Account info */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Profil de risque</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Capital</span>
+                <span className="font-mono font-semibold">${Number(account.capital).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Risque</span>
+                <span className="font-mono font-semibold">
+                  {account.riskLevel === "LOW" ? "Faible (0.5%)" : account.riskLevel === "HIGH" ? "Élevé (1.5%)" : "Moyen (1%)"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Unité de temps</span>
+                <span className="font-mono font-semibold">{account.timeframe}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Objectif</span>
+                <span className="font-mono font-semibold">${Number(account.profitTarget).toLocaleString()}</span>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -369,7 +487,7 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle>Confirmer l'ouverture du trade</DialogTitle>
             <DialogDescription>
-              Cette action ajoute la position à votre portefeuille pour que vous puissiez enregistrer le résultat à la fermeture.
+              Ajoutez cette position à votre portefeuille pour suivre son résultat.
             </DialogDescription>
           </DialogHeader>
 
@@ -383,7 +501,7 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="bg-muted/50 rounded p-3">
-                  <div className="text-muted-foreground text-xs mb-1">Entrée</div>
+                  <div className="text-muted-foreground text-xs mb-1">Entrée live</div>
                   <div className="font-mono font-semibold">{confirmSignal.entry}</div>
                 </div>
                 <div className="bg-muted/50 rounded p-3">
@@ -396,7 +514,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                La taille de position et le P&L seront calculés selon votre profil de risque ({confirmSignal.riskPercent}% de risque).
+                Risque : {confirmSignal.riskPercent}% du capital selon votre profil.
               </p>
             </div>
           )}

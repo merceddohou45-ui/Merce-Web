@@ -4,6 +4,7 @@ import { Activity, LayoutDashboard, History, Settings, LogOut, PieChart, Brain }
 import { Button } from "@/components/ui/button";
 import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { PWAInstallButton } from "@/components/pwa-install";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -13,20 +14,24 @@ export function Layout({ children }: { children: ReactNode }) {
   const navItems = [
     { path: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
     { path: "/portefeuille", label: "Portefeuille", icon: PieChart },
-    { path: "/signaux", label: "Historique signaux", icon: History },
+    { path: "/signaux", label: "Signaux", icon: History },
     { path: "/psychologie", label: "Psychologie", icon: Brain },
     { path: "/compte-trading", label: "Paramètres", icon: Settings },
   ];
 
   const handleLogout = async () => {
-    await logout.mutateAsync();
+    try {
+      await logout.mutateAsync();
+    } catch {
+      /* ignore */
+    }
     queryClient.clear();
     setLocation("/connexion");
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
-      {/* Sidebar — desktop: left column; mobile: bottom tab bar */}
+      {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col shrink-0">
         <div className="p-6 border-b border-border flex items-center gap-3">
           <div className="bg-accent/10 p-2 rounded-lg">
@@ -51,13 +56,17 @@ export function Layout({ children }: { children: ReactNode }) {
                       : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
                   }`}
                 >
-                  <Icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-accent" : ""}`} />
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-accent" : ""}`} />
                   {item.label}
                 </div>
               </Link>
             );
           })}
         </nav>
+
+        <div className="pb-2">
+          <PWAInstallButton />
+        </div>
 
         <div className="p-4 border-t border-border">
           <Button
@@ -81,13 +90,13 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom tab bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border flex items-center justify-around px-1 py-2 safe-bottom">
-        {navItems.map((item) => {
+        {navItems.slice(0, 5).map((item) => {
           const Icon = item.icon;
           const isActive = location.startsWith(item.path);
           return (
             <Link key={item.path} href={item.path}>
               <div
-                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer min-w-[52px] ${
+                className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors cursor-pointer min-w-[48px] ${
                   isActive ? "text-accent" : "text-muted-foreground"
                 }`}
               >

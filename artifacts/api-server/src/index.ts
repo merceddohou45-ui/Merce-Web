@@ -4,6 +4,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { generateSignals } from "./lib/marketEngine";
 import { db, tradingAccountTable, signalHistoryTable, portfolioPositionTable } from "@workspace/db";
+import { pool } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
@@ -11,30 +12,55 @@ if (!rawPort) throw new Error("PORT environment variable is required but was not
 const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) throw new Error(`Invalid PORT value: "${rawPort}"`);
 
+// ─── Ensure user_sessions table exists (connect-pg-simple v10 createTableIfMissing is unreliable) ─
+async function ensureSessionTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+      ) WITH (OIDS=FALSE);
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON user_sessions ("expire");
+    `);
+    logger.info("Table user_sessions vérifiée / créée");
+  } catch (err) {
+    logger.error({ err }, "Erreur création table user_sessions");
+  } finally {
+    client.release();
+  }
+}
+
 const server = http.createServer(app);
 
-// WebSocket server for live signals
-const wss = new WebSocketServer({ server, path: "/ws/live-signals" });
+// ─── WebSocket server ─────────────────────────────────────────────────────────
+// Path must match the API Server preview path prefix so the Replit proxy can route it
+const WS_PATH = "/api/ws/live-signals";
+const wss = new WebSocketServer({ server, path: WS_PATH });
 const clients = new Set<WebSocket>();
 
 wss.on("connection", (ws) => {
   clients.add(ws);
-  logger.info({ clientCount: clients.size }, "WebSocket client connected");
+  logger.info({ clientCount: clients.size }, "WebSocket client connecté");
 
   ws.on("close", () => {
     clients.delete(ws);
-    logger.info({ clientCount: clients.size }, "WebSocket client disconnected");
+    logger.info({ clientCount: clients.size }, "WebSocket client déconnecté");
   });
 
   ws.on("error", (err) => {
-    logger.error({ err }, "WebSocket error");
+    logger.error({ err }, "WebSocket erreur");
     clients.delete(ws);
   });
 
   ws.send(JSON.stringify({ type: "connected", message: "Flux de signaux en direct actif" }));
 });
 
-function broadcast(data: unknown) {
+function broadcast(data: unknown): void {
   const msg = JSON.stringify(data);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
@@ -43,12 +69,11 @@ function broadcast(data: unknown) {
   }
 }
 
-// Auto-scan: runs every 30 seconds (quality over quantity)
-async function autoScan() {
+// ─── Auto-scan (every 30 s) ───────────────────────────────────────────────────
+async function autoScan(): Promise<void> {
   try {
     if (clients.size === 0) return;
 
-    // Get all configured trading accounts
     const accounts = await db
       .select()
       .from(tradingAccountTable)
@@ -57,10 +82,8 @@ async function autoScan() {
 
     if (accounts.length === 0) return;
 
-    // Use the most recently updated account for signal generation
     const account = accounts[0]!;
 
-    // Find symbols with open positions to enforce active-position lock
     const openPositions = await db
       .select({ symbol: portfolioPositionTable.symbol })
       .from(portfolioPositionTable)
@@ -72,11 +95,10 @@ async function autoScan() {
     const riskLevel = (account.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
     const timeframe = account.timeframe ?? "H1";
 
-    const signals = generateSignals(account.platformName, riskLevel, timeframe, capital, openSymbols);
+    const signals = await generateSignals(account.platformName, riskLevel, timeframe, capital, openSymbols);
 
     if (signals.length === 0) return;
 
-    // Broadcast at most 1 signal per scan cycle (quality over quantity)
     const selected = signals[Math.floor(Math.random() * signals.length)]!;
 
     const [saved] = await db.insert(signalHistoryTable).values({
@@ -95,20 +117,25 @@ async function autoScan() {
     }).returning();
 
     broadcast({ type: "signal", data: { ...selected, dbId: saved!.id } });
-    logger.info({ symbol: selected.symbol, direction: selected.direction }, "Signal diffusé après analyse complète");
+    logger.info({ symbol: selected.symbol, direction: selected.direction }, "Signal diffusé");
   } catch (err) {
-    logger.error({ err }, "Erreur lors de l'analyse automatique");
+    logger.error({ err }, "Erreur scan automatique");
   }
 }
 
-// 30-second scan interval — quality signals only
-const SCAN_INTERVAL_MS = 30000;
-setInterval(autoScan, SCAN_INTERVAL_MS);
+const SCAN_INTERVAL_MS = 30_000;
 
-server.listen(port, (err?: Error) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
-  logger.info({ port }, "Server listening with WebSocket support");
+// ─── Start ────────────────────────────────────────────────────────────────────
+async function start(): Promise<void> {
+  await ensureSessionTable();
+
+  server.listen(port, () => {
+    logger.info({ port, wsPath: WS_PATH }, "Serveur démarré avec support WebSocket");
+    setInterval(() => { autoScan().catch((err) => logger.error({ err }, "autoScan failure")); }, SCAN_INTERVAL_MS);
+  });
+}
+
+start().catch((err) => {
+  logger.error({ err }, "Erreur démarrage serveur");
+  process.exit(1);
 });

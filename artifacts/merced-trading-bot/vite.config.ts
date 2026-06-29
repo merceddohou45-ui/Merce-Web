@@ -22,27 +22,45 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
+      devOptions: {
+        enabled: false,
+      },
       manifest: {
-        name: "Merced Trading Bot",
+        name: "Merced Intelligence",
         short_name: "Merced",
-        description: "Bot de trading intelligent avec signaux en temps réel",
+        description: "Signaux de trading professionnels basés sur l'analyse technique en temps réel",
         start_url: basePath,
+        scope: basePath,
         display: "standalone",
         background_color: "#09090b",
         theme_color: "#22c55e",
         orientation: "portrait-primary",
+        lang: "fr",
+        categories: ["finance", "productivity"],
         icons: [
           {
             src: `${basePath}icons/icon-192.png`,
             sizes: "192x192",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: `${basePath}icons/icon-192.png`,
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "maskable",
           },
           {
             src: `${basePath}icons/icon-512.png`,
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: `${basePath}icons/icon-512.png`,
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
         shortcuts: [
@@ -50,16 +68,19 @@ export default defineConfig({
             name: "Tableau de bord",
             url: `${basePath}dashboard`,
             description: "Voir les signaux en direct",
+            icons: [{ src: `${basePath}icons/icon-192.png`, sizes: "192x192" }],
           },
           {
             name: "Portefeuille",
             url: `${basePath}portefeuille`,
             description: "Gérer mes positions",
+            icons: [{ src: `${basePath}icons/icon-192.png`, sizes: "192x192" }],
           },
         ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: /\/api\//,
@@ -67,6 +88,15 @@ export default defineConfig({
             options: {
               cacheName: "api-cache",
               expiration: { maxEntries: 50, maxAgeSeconds: 300 },
+              networkTimeoutSeconds: 10,
+            },
+          },
+          {
+            urlPattern: /\/icons\//,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "icon-cache",
+              expiration: { maxEntries: 10, maxAgeSeconds: 86400 },
             },
           },
         ],
