@@ -13,24 +13,137 @@ if (!rawPort) throw new Error("PORT environment variable is required but was not
 const port = Number(rawPort);
 if (Number.isNaN(port) || port <= 0) throw new Error(`Invalid PORT value: "${rawPort}"`);
 
-// ─── Ensure user_sessions table exists (connect-pg-simple v10 createTableIfMissing is unreliable) ─
-async function ensureSessionTable(): Promise<void> {
+// ─── Ensure all database tables exist (idempotent, runs on every startup) ─────
+async function ensureAllTables(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        display_name TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS trading_profiles (
+        id SERIAL PRIMARY KEY,
+        capital NUMERIC(15,2) NOT NULL,
+        profit_target NUMERIC(15,2) NOT NULL,
+        profit_target_percent NUMERIC(8,2),
+        risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
+        timeframe TEXT NOT NULL DEFAULT 'M5',
+        broker TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS trading_accounts (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        platform_name TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        account_password TEXT,
+        capital NUMERIC(15,2) NOT NULL,
+        profit_target NUMERIC(15,2) NOT NULL,
+        risk_level TEXT NOT NULL DEFAULT 'MEDIUM',
+        timeframe TEXT NOT NULL DEFAULT 'H1',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS signal_history (
+        id SERIAL PRIMARY KEY,
+        symbol TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        entry NUMERIC(20,8) NOT NULL,
+        stop_loss NUMERIC(20,8) NOT NULL,
+        take_profit1 NUMERIC(20,8) NOT NULL,
+        take_profit2 NUMERIC(20,8) NOT NULL,
+        take_profit3 NUMERIC(20,8) NOT NULL,
+        timeframe TEXT NOT NULL,
+        confidence INTEGER NOT NULL,
+        risk_percent NUMERIC(8,2) NOT NULL,
+        reason TEXT,
+        status TEXT NOT NULL DEFAULT 'active',
+        profit_loss NUMERIC(15,2),
+        generated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS portfolio_positions (
+        id SERIAL PRIMARY KEY,
+        signal_id INTEGER REFERENCES signal_history(id),
+        symbol TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        entry NUMERIC(20,8) NOT NULL,
+        stop_loss NUMERIC(20,8) NOT NULL,
+        take_profit1 NUMERIC(20,8) NOT NULL,
+        take_profit2 NUMERIC(20,8) NOT NULL,
+        take_profit3 NUMERIC(20,8) NOT NULL,
+        timeframe TEXT NOT NULL,
+        confidence INTEGER NOT NULL,
+        risk_percent NUMERIC(8,2) NOT NULL,
+        lot_size NUMERIC(10,4) NOT NULL DEFAULT 0.01,
+        capital_at_open NUMERIC(15,2) NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        close_reason TEXT,
+        close_price NUMERIC(20,8),
+        realized_pnl NUMERIC(15,2),
+        unrealized_pnl NUMERIC(15,2),
+        tp_hit TEXT,
+        is_partial_close BOOLEAN DEFAULT FALSE,
+        opened_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        closed_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS journal_entries (
+        id SERIAL PRIMARY KEY,
+        position_id INTEGER NOT NULL REFERENCES portfolio_positions(id) ON DELETE CASCADE,
+        entry_type TEXT NOT NULL DEFAULT 'note',
+        emotion TEXT,
+        reasoning TEXT,
+        notes TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS broker_sessions (
+        id SERIAL PRIMARY KEY,
+        broker TEXT NOT NULL,
+        api_key TEXT NOT NULL,
+        api_key_masked TEXT NOT NULL,
+        account_id TEXT,
+        balance NUMERIC(15,2),
+        currency TEXT,
+        connected BOOLEAN NOT NULL DEFAULT TRUE,
+        connected_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        disconnected_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+
       CREATE TABLE IF NOT EXISTS user_sessions (
         "sid" varchar NOT NULL COLLATE "default",
         "sess" json NOT NULL,
         "expire" timestamp(6) NOT NULL,
         CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
-      ) WITH (OIDS=FALSE);
+      );
     `);
     await client.query(`
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON user_sessions ("expire");
     `);
-    logger.info("Table user_sessions vérifiée / créée");
+    logger.info("Toutes les tables vérifiées / créées");
   } catch (err) {
-    logger.error({ err }, "Erreur création table user_sessions");
+    logger.error({ err }, "Erreur création tables");
+    throw err;
   } finally {
     client.release();
   }
@@ -137,7 +250,7 @@ const SCAN_INTERVAL_MS = 30_000;
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function start(): Promise<void> {
-  await ensureSessionTable();
+  await ensureAllTables();
 
   server.listen(port, () => {
     logger.info({ port, wsPath: WS_PATH }, "Serveur démarré avec support WebSocket");
