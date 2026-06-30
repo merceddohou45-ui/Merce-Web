@@ -32,6 +32,7 @@ const SYMBOL_MAP: Record<string, string> = {
 
 // ─── Cache ────────────────────────────────────────────────────────────────────
 interface OHLCVEntry {
+  opens: number[];
   closes: number[];
   highs: number[];
   lows: number[];
@@ -46,10 +47,19 @@ interface PriceCacheEntry {
 const ohlcvCache = new Map<string, OHLCVEntry>();
 const priceCache = new Map<string, PriceCacheEntry>();
 
-const OHLCV_TTL = 5 * 60 * 1000;
-const PRICE_TTL = 30 * 1000;
+// M1 data expires quickly; H1 can be cached longer
+const OHLCV_TTL_MS: Record<string, number> = {
+  M1:  60 * 1000,        // 1 min
+  M5:  2 * 60 * 1000,    // 2 min
+  M15: 3 * 60 * 1000,    // 3 min
+  H1:  5 * 60 * 1000,    // 5 min
+  H4: 15 * 60 * 1000,    // 15 min
+  D1: 30 * 60 * 1000,    // 30 min
+};
+const DEFAULT_OHLCV_TTL = 5 * 60 * 1000;
+const PRICE_TTL = 20 * 1000;
 
-// ─── Rate limiting (8 req/min for free tier) ──────────────────────────────────
+// ─── Rate limiting (8 req/min for free tier — stay at 6 to be safe) ───────────
 let requestsThisMinute = 0;
 let minuteStart = Date.now();
 
@@ -59,7 +69,7 @@ function canMakeRequest(): boolean {
     requestsThisMinute = 0;
     minuteStart = now;
   }
-  return requestsThisMinute < 7;
+  return requestsThisMinute < 6;
 }
 
 function recordRequest(): void {
@@ -73,25 +83,26 @@ export function getTwelveSymbol(symbol: string): string {
 
 export function intervalFromTimeframe(timeframe: string): string {
   const map: Record<string, string> = {
-    M1: "1min",
-    M5: "5min",
+    M1:  "1min",
+    M5:  "5min",
     M15: "15min",
-    H1: "1h",
-    H4: "4h",
-    D1: "1day",
+    H1:  "1h",
+    H4:  "4h",
+    D1:  "1day",
   };
   return map[timeframe] ?? "1h";
 }
 
-// ─── OHLCV fetch ──────────────────────────────────────────────────────────────
+// ─── OHLCV fetch (includes opens for candle pattern detection) ────────────────
 interface TimeSeriesResponse {
-  values?: Array<{ close: string; high: string; low: string; datetime: string }>;
+  values?: Array<{ open: string; close: string; high: string; low: string; datetime: string }>;
   status?: string;
   message?: string;
   code?: number;
 }
 
 export interface OHLCVData {
+  opens: number[];
   closes: number[];
   highs: number[];
   lows: number[];
@@ -100,12 +111,14 @@ export interface OHLCVData {
 export async function fetchOHLCV(
   symbol: string,
   timeframe = "H1",
-  bars = 60
+  bars = 80,
 ): Promise<OHLCVData | null> {
   const cacheKey = `${symbol}:${timeframe}`;
   const cached = ohlcvCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < OHLCV_TTL) {
-    return { closes: cached.closes, highs: cached.highs, lows: cached.lows };
+  const ttl = OHLCV_TTL_MS[timeframe] ?? DEFAULT_OHLCV_TTL;
+
+  if (cached && Date.now() - cached.timestamp < ttl) {
+    return { opens: cached.opens, closes: cached.closes, highs: cached.highs, lows: cached.lows };
   }
 
   if (!API_KEY) {
@@ -114,8 +127,8 @@ export async function fetchOHLCV(
   }
 
   if (!canMakeRequest()) {
-    logger.warn({ symbol }, "Limite API Twelve Data atteinte — utilisation du cache");
-    if (cached) return { closes: cached.closes, highs: cached.highs, lows: cached.lows };
+    logger.warn({ symbol, timeframe }, "Limite API Twelve Data — utilisation du cache");
+    if (cached) return { opens: cached.opens, closes: cached.closes, highs: cached.highs, lows: cached.lows };
     return null;
   }
 
@@ -129,25 +142,26 @@ export async function fetchOHLCV(
     const data = (await response.json()) as TimeSeriesResponse;
 
     if (data.status === "error" || data.code) {
-      logger.warn({ symbol, msg: data.message }, "Twelve Data erreur OHLCV");
+      logger.warn({ symbol, timeframe, msg: data.message }, "Twelve Data erreur OHLCV");
       return null;
     }
 
     if (!data.values || data.values.length === 0) {
-      logger.warn({ symbol }, "Twelve Data: aucune valeur retournée");
+      logger.warn({ symbol, timeframe }, "Twelve Data: aucune valeur retournée");
       return null;
     }
 
     const reversed = [...data.values].reverse();
+    const opens  = reversed.map((v) => parseFloat(v.open));
     const closes = reversed.map((v) => parseFloat(v.close));
-    const highs = reversed.map((v) => parseFloat(v.high));
-    const lows = reversed.map((v) => parseFloat(v.low));
+    const highs  = reversed.map((v) => parseFloat(v.high));
+    const lows   = reversed.map((v) => parseFloat(v.low));
 
-    ohlcvCache.set(cacheKey, { closes, highs, lows, timestamp: Date.now() });
-    logger.info({ symbol, bars: closes.length, timeframe }, "✅ Données OHLCV réelles récupérées");
-    return { closes, highs, lows };
+    ohlcvCache.set(cacheKey, { opens, closes, highs, lows, timestamp: Date.now() });
+    logger.info({ symbol, bars: closes.length, timeframe }, "✅ OHLCV récupéré depuis Twelve Data");
+    return { opens, closes, highs, lows };
   } catch (err) {
-    logger.error({ err, symbol }, "Erreur fetch Twelve Data OHLCV");
+    logger.error({ err, symbol, timeframe }, "Erreur fetch Twelve Data OHLCV");
     return null;
   }
 }
@@ -204,7 +218,6 @@ interface BatchPriceResponse {
 export async function fetchBatchPrices(symbols: string[]): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
 
-  // Check cache first
   const needed: string[] = [];
   for (const sym of symbols) {
     const cached = priceCache.get(sym);

@@ -2,7 +2,7 @@ import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import app from "./app";
 import { logger } from "./lib/logger";
-import { generateSignals } from "./lib/marketEngine";
+import { generateSignalForAsset, generateSignals, getBrokerAssets } from "./lib/marketEngine";
 import { db, tradingAccountTable, signalHistoryTable, portfolioPositionTable } from "@workspace/db";
 import { pool } from "@workspace/db";
 import { desc, eq } from "drizzle-orm";
@@ -183,7 +183,14 @@ function broadcast(data: unknown): void {
   }
 }
 
-// ─── Auto-scan (every 30 s) ───────────────────────────────────────────────────
+// ─── Signal deduplication: 60-min cooldown per symbol ────────────────────────
+const signalCooldowns = new Map<string, number>(); // symbol → last broadcast timestamp
+const SIGNAL_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
+// ─── Asset rotation state ─────────────────────────────────────────────────────
+let assetRotationIndex = 0;
+
+// ─── Auto-scan (every 45 s) — analyzes ONE asset per cycle (multi-TF) ────────
 async function autoScan(): Promise<void> {
   try {
     if (clients.size === 0) return;
@@ -192,61 +199,85 @@ async function autoScan(): Promise<void> {
       .select()
       .from(tradingAccountTable)
       .orderBy(desc(tradingAccountTable.createdAt))
-      .limit(10);
+      .limit(1);
 
     if (accounts.length === 0) return;
 
     const account = accounts[0]!;
+    const riskLevel = (account.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
 
     const openPositions = await db
       .select({ symbol: portfolioPositionTable.symbol })
       .from(portfolioPositionTable)
       .where(eq(portfolioPositionTable.status, "open"));
 
-    const openSymbols = openPositions.map((p) => p.symbol);
+    const openSymbols = new Set(openPositions.map((p) => p.symbol));
 
-    const capital = parseFloat(account.capital);
-    const riskLevel = (account.riskLevel ?? "MEDIUM") as "LOW" | "MEDIUM" | "HIGH";
-    const timeframe = account.timeframe ?? "H1";
+    // Get full asset list for this broker
+    const assets = getBrokerAssets(account.platformName).filter((a) => !openSymbols.has(a.symbol));
+    if (assets.length === 0) return;
 
-    const signals = await generateSignals(account.platformName, riskLevel, timeframe, capital, openSymbols);
+    // Pick one asset (rotating) and analyze it with multi-timeframe
+    const idx = assetRotationIndex % assets.length;
+    assetRotationIndex = (assetRotationIndex + 1) % assets.length;
+    const asset = assets[idx]!;
 
-    if (signals.length === 0) return;
+    // Skip if within cooldown window (avoid duplicate signals for the same symbol)
+    const lastSignalAt = signalCooldowns.get(asset.symbol) ?? 0;
+    if (Date.now() - lastSignalAt < SIGNAL_COOLDOWN_MS) {
+      logger.info(
+        { symbol: asset.symbol, cooldownRemainingMin: Math.round((SIGNAL_COOLDOWN_MS - (Date.now() - lastSignalAt)) / 60000) },
+        "⏳ Symbol en cooldown — analyse ignorée"
+      );
+      return;
+    }
 
-    const selected = signals[Math.floor(Math.random() * signals.length)]!;
+    logger.info({ symbol: asset.symbol }, "🔍 Auto-scan multi-timeframe");
+    const signal = await generateSignalForAsset(asset, riskLevel);
 
+    if (!signal) return; // conditions not met or confidence < 90%
+
+    // Persist to DB
     const [saved] = await db.insert(signalHistoryTable).values({
-      symbol: selected.symbol,
-      direction: selected.direction,
-      entry: selected.entry.toString(),
-      stopLoss: selected.stopLoss.toString(),
-      takeProfit1: selected.takeProfit1.toString(),
-      takeProfit2: selected.takeProfit2.toString(),
-      takeProfit3: selected.takeProfit3.toString(),
-      timeframe: selected.timeframe,
-      confidence: selected.confidence,
-      riskPercent: selected.riskPercent.toString(),
-      reason: selected.reason,
-      status: "active",
+      symbol:      signal.symbol,
+      direction:   signal.direction,
+      entry:       signal.entry.toString(),
+      stopLoss:    signal.stopLoss.toString(),
+      takeProfit1: signal.takeProfit1.toString(),
+      takeProfit2: signal.takeProfit2.toString(),
+      takeProfit3: signal.takeProfit3.toString(),
+      timeframe:   signal.timeframe,
+      confidence:  signal.confidence,
+      riskPercent: signal.riskPercent.toString(),
+      reason:      signal.reason,
+      status:      "active",
     }).returning();
 
-    broadcast({ type: "signal", data: { ...selected, dbId: saved!.id } });
-    logger.info({ symbol: selected.symbol, direction: selected.direction }, "Signal diffusé");
+    // Mark cooldown
+    signalCooldowns.set(asset.symbol, Date.now());
 
-    // Push notification to all subscribed devices
-    const dirLabel = selected.direction === "BUY" ? "📈 ACHAT" : "📉 VENTE";
+    // Broadcast via WebSocket
+    broadcast({ type: "signal", data: { ...signal, dbId: saved!.id } });
+    logger.info(
+      { symbol: signal.symbol, direction: signal.direction, confidence: signal.confidence },
+      "📡 Signal haute qualité diffusé"
+    );
+
+    // Push notification
+    const dirLabel = signal.direction === "BUY" ? "📈 ACHAT" : "📉 VENTE";
     sendPushNotification({
-      title: `${dirLabel} — ${selected.symbol}`,
-      body: `Entrée: ${selected.entry.toFixed(5)} | Confiance: ${selected.confidence}% | TF: ${selected.timeframe}`,
-      tag: `signal-${selected.symbol}`,
-      url: "/dashboard",
+      title: `${dirLabel} — ${signal.symbol}`,
+      body:  `Entrée: ${signal.entry.toFixed(5)} | Confiance: ${signal.confidence}% | TF: M1/M5/M15/H1`,
+      tag:   `signal-${signal.symbol}`,
+      url:   "/dashboard",
     }).catch(() => { /* ignore push errors */ });
+
   } catch (err) {
     logger.error({ err }, "Erreur scan automatique");
   }
 }
 
-const SCAN_INTERVAL_MS = 30_000;
+const SCAN_INTERVAL_MS = 45_000; // 45s: one asset per cycle, 4 TF fetches each
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function start(): Promise<void> {
