@@ -20,18 +20,24 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorOverlay(),
     VitePWA({
+      // injectManifest: you write your own SW (src/sw.ts) and Workbox injects
+      // the precache manifest into self.__WB_MANIFEST at build time.
+      // The `workbox` property only controls glob patterns for manifest injection.
+      // All runtime caching logic belongs inside sw.ts itself.
       registerType: "autoUpdate",
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.ts",
       injectRegister: "auto",
+      // Enable in dev so the install flow can be tested locally
       devOptions: {
-        enabled: false,
+        enabled: true,
+        type: "module",
       },
       manifest: {
-        name: "Merced Intelligence",
-        short_name: "Merced",
-        description: "Signaux de trading professionnels basés sur l'analyse technique en temps réel",
+        name: "Merced Trading Bot",
+        short_name: "MTB",
+        description: "Signaux de trading professionnels basés sur l'analyse technique multi-timeframe en temps réel",
         start_url: basePath,
         scope: basePath,
         display: "standalone",
@@ -74,35 +80,17 @@ export default defineConfig({
             icons: [{ src: `${basePath}icons/icon-192.png`, sizes: "192x192" }],
           },
           {
-            name: "Portefeuille",
-            url: `${basePath}portefeuille`,
-            description: "Gérer mes positions",
+            name: "Signaux",
+            url: `${basePath}signaux`,
+            description: "Historique des signaux",
             icons: [{ src: `${basePath}icons/icon-192.png`, sizes: "192x192" }],
           },
         ],
       },
+      // With injectManifest, only globPatterns matters here.
+      // Runtime caching logic is defined directly in src/sw.ts.
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallback: null,
-        runtimeCaching: [
-          {
-            urlPattern: /\/api\//,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
-              networkTimeoutSeconds: 10,
-            },
-          },
-          {
-            urlPattern: /\/icons\//,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "icon-cache",
-              expiration: { maxEntries: 10, maxAgeSeconds: 86400 },
-            },
-          },
-        ],
       },
     }),
     ...(process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined

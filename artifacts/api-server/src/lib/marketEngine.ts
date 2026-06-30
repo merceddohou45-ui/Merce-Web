@@ -3,7 +3,7 @@ import { fetchOHLCV, fetchLivePrice } from "./twelveData";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
-export type Timeframe = "M1" | "M5" | "M15" | "H1";
+export type Timeframe = "M1" | "M5" | "M15" | "H1" | "H4";
 
 export interface MarketSignal {
   symbol: string;
@@ -322,6 +322,7 @@ interface MTFScore {
   conditions: string[];
   m1: TFIndicators;
   h1: TFIndicators;
+  h4: TFIndicators | null;
 }
 
 function scoreMTF(
@@ -329,8 +330,36 @@ function scoreMTF(
   m5: TFIndicators | null,
   m15: TFIndicators | null,
   h1: TFIndicators,
+  h4: TFIndicators | null,
   livePrice: number,
 ): MTFScore | null {
+  // ── Step 0: H4 macro filter (if available) ───────────────────────────────────
+  // H4 acts as a macro regime filter — if H4 is strongly against the H1 direction,
+  // we reject the signal early to avoid counter-trend trades on the wrong side.
+  if (h4) {
+    const h4StrongBear = h4.trendDir === "DOWN" && h4.marketStructure === "DOWNTREND";
+    const h4StrongBull = h4.trendDir === "UP"   && h4.marketStructure === "UPTREND";
+
+    // If H4 is a strong regime in one direction, we only allow signals aligned with it
+    if (h4StrongBear || h4StrongBull) {
+      const h1Bull =
+        h1.trendDir === "UP" && h1.marketStructure !== "DOWNTREND" &&
+        livePrice > h1.ema20 && livePrice > h1.ema50;
+      const h1Bear =
+        h1.trendDir === "DOWN" && h1.marketStructure !== "UPTREND" &&
+        livePrice < h1.ema20 && livePrice < h1.ema50;
+
+      if (h4StrongBear && h1Bull) {
+        logger.info({ livePrice }, "❌ Signal BUY rejeté — régime H4 baissier fort (contre-tendance)");
+        return null;
+      }
+      if (h4StrongBull && h1Bear) {
+        logger.info({ livePrice }, "❌ Signal SELL rejeté — régime H4 haussier fort (contre-tendance)");
+        return null;
+      }
+    }
+  }
+
   // ── Step 1: Determine direction from H1 (master timeframe) ──────────────────
   const h1Bull =
     h1.trendDir === "UP" &&
@@ -351,6 +380,32 @@ function scoreMTF(
   // ── Step 2: Score all conditions across timeframes ───────────────────────────
   const conditions: string[] = [];
   let score = 0;
+
+  // --- Condition 0: H4 macro alignment (adds significant weight when present) ──
+  if (h4) {
+    const h4AlignsBull = h4.trendDir === "UP"   && h4.marketStructure !== "DOWNTREND";
+    const h4AlignsBear = h4.trendDir === "DOWN"  && h4.marketStructure !== "UPTREND";
+
+    if (direction === "BUY" && h4AlignsBull) {
+      conditions.push(`Macro-tendance H4 haussière validée (EMA20: ${h4.ema20.toFixed(5)})`);
+      score += 12;
+      // Bonus: full EMA stack on H4
+      if (h4.ema9 > h4.ema20 && h4.ema20 > h4.ema50) {
+        score += 5;
+        conditions.push("Alignement parfait EMA9 > EMA20 > EMA50 sur H4");
+      }
+    } else if (direction === "SELL" && h4AlignsBear) {
+      conditions.push(`Macro-tendance H4 baissière validée (EMA20: ${h4.ema20.toFixed(5)})`);
+      score += 12;
+      if (h4.ema9 < h4.ema20 && h4.ema20 < h4.ema50) {
+        score += 5;
+        conditions.push("Alignement parfait EMA9 < EMA20 < EMA50 sur H4");
+      }
+    } else {
+      // H4 doesn't confirm — mild penalty
+      score -= 4;
+    }
+  }
 
   // --- Condition 1: H1 Trend Confirmation (mandatory) ─────────────────────────
   if (direction === "BUY" && h1.trendDir === "UP") {
@@ -528,10 +583,77 @@ function scoreMTF(
   }
 
   // ── Step 3: Normalize score to 0-100 range ────────────────────────────────────
-  const maxScore = 110; // theoretical max of all conditions
+  // Max score depends on which timeframes were available:
+  //   Base (M1/M5/M15/H1 fully scored) ≈ 110
+  //   +H4 bonus (macro + EMA stack)     ≈ +17 → 127
+  // Use a context-aware max so the 88% threshold is meaningful whether or not H4 data arrived.
+  const maxScore = h4 ? 127 : 110;
   const normalized = Math.max(0, Math.min(100, Math.round((score / maxScore) * 100)));
 
-  return { direction, confidence: normalized, conditions, m1, h1 };
+  return { direction, confidence: normalized, conditions, m1, h1, h4: h4 ?? null };
+}
+
+// ─── Deterministic reason builder (no Math.random) ────────────────────────────
+// Generates a specific, accurate reason based on what conditions were actually met.
+function buildReason(
+  direction: "BUY" | "SELL",
+  conditions: string[],
+  h4Available: boolean,
+): string {
+  const hasMacdCross  = conditions.some((c) => c.includes("Croisement MACD"));
+  const hasEngulfing  = conditions.some((c) => c.includes("englobement"));
+  const hasLiquidity  = conditions.some((c) => c.includes("liquidité"));
+  const hasSR         = conditions.some((c) => c.includes("Support") || c.includes("Résistance"));
+  const hasH4         = conditions.some((c) => c.includes("H4"));
+  const hasEmaStack   = conditions.some((c) => c.includes("EMA9 > EMA20 > EMA50") || c.includes("EMA9 < EMA20 < EMA50"));
+
+  if (direction === "BUY") {
+    if (hasH4 && hasEngulfing && hasMacdCross) {
+      return "Convergence M1/M5/M15/H1/H4 haussière — croisement MACD H1 + englobement M1 + macro H4 alignée";
+    }
+    if (hasH4 && hasEmaStack) {
+      return "Alignement EMA parfait H4/H1/M5 — régime macro haussier avec entrée précise sur M1";
+    }
+    if (hasMacdCross && hasEngulfing) {
+      return "Croisement MACD H1 haussier confirmé par bougie d'englobement M1 — signal de haute probabilité";
+    }
+    if (hasLiquidity && hasSR) {
+      return "Zone de liquidité haussière identifiée — RSI survendu H1 avec rebond M15/M5 aligné";
+    }
+    if (hasEngulfing) {
+      return "Tendance H1 confirmée par structure de marché — entrée précise sur M1 avec englobement haussier";
+    }
+    if (hasH4) {
+      return "Macro-tendance H4 haussière avec confirmation multi-timeframe H1/M15/M5 — qualité institutionnelle";
+    }
+    if (h4Available) {
+      return "Structure de marché haussière avec confirmation multi-timeframe — entrée sur support validé";
+    }
+    return "Convergence multi-temporelle haussière — EMA + MACD + RSI alignés à la hausse sur H1/M15/M5/M1";
+  } else {
+    if (hasH4 && hasEngulfing && hasMacdCross) {
+      return "Convergence M1/M5/M15/H1/H4 baissière — croisement MACD H1 + englobement M1 + macro H4 alignée";
+    }
+    if (hasH4 && hasEmaStack) {
+      return "Alignement EMA parfait H4/H1/M5 — régime macro baissier avec entrée précise sur M1";
+    }
+    if (hasMacdCross && hasEngulfing) {
+      return "Croisement MACD H1 baissier confirmé par bougie d'englobement M1 — signal de haute probabilité";
+    }
+    if (hasLiquidity && hasSR) {
+      return "Zone de liquidité baissière identifiée — RSI suracheté H1 avec rejet M15/M5 aligné";
+    }
+    if (hasEngulfing) {
+      return "Tendance H1 confirmée par structure de marché — entrée précise sur M1 avec englobement baissier";
+    }
+    if (hasH4) {
+      return "Macro-tendance H4 baissière avec confirmation multi-timeframe H1/M15/M5 — qualité institutionnelle";
+    }
+    if (h4Available) {
+      return "Structure de marché baissière avec confirmation multi-timeframe — vente sur résistance validée";
+    }
+    return "Convergence multi-temporelle baissière — EMA + MACD + RSI alignés à la baisse sur H1/M15/M5/M1";
+  }
 }
 
 // ─── Signal builder ───────────────────────────────────────────────────────────
@@ -551,41 +673,25 @@ function getMomentum(rsi: number): AnalysisDetails["momentum"] {
   return "NEUTRE";
 }
 
-const FRENCH_REASONS: Record<"BUY" | "SELL", string[]> = {
-  BUY: [
-    "Convergence multi-temporelle haussière — EMA + MACD + RSI alignés à la hausse sur H1/M15/M5/M1",
-    "Structure de marché haussière avec confirmation multi-timeframe — entrée sur support validé",
-    "Croisement EMA haussier H1 confirmé par momentum M5 et bougie M1 — signal de haute probabilité",
-    "Zone de liquidité haussière identifiée — RSI survendu H1 avec rebond M15/M5 aligné",
-    "Tendance H1 confirmée par structure de marché — entrée précise sur M1 avec englobement haussier",
-  ],
-  SELL: [
-    "Convergence multi-temporelle baissière — EMA + MACD + RSI alignés à la baisse sur H1/M15/M5/M1",
-    "Structure de marché baissière avec confirmation multi-timeframe — vente sur résistance validée",
-    "Croisement EMA baissier H1 confirmé par momentum M5 et bougie M1 — signal de haute probabilité",
-    "Zone de liquidité baissière identifiée — RSI suracheté H1 avec rejet M15/M5 aligné",
-    "Tendance H1 confirmée par structure de marché — entrée précise sur M1 avec englobement baissier",
-  ],
-};
-
 function buildSignal(
   asset: AssetInfo,
   mtf: MTFScore,
   livePrice: number,
   riskLevel: RiskLevel,
 ): MarketSignal {
-  const { direction, confidence, conditions, m1, h1 } = mtf;
+  const { direction, confidence, conditions, m1, h1, h4 } = mtf;
   const decimals = getDecimals(asset);
   const round = (n: number) => parseFloat(n.toFixed(decimals));
 
   const riskMultipliers: Record<RiskLevel, number> = { LOW: 0.006, MEDIUM: 0.010, HIGH: 0.015 };
   const slDistance = livePrice * riskMultipliers[riskLevel];
 
-  // Use ATR to refine SL distance if available
-  const atrSL = h1.atr > 0 ? Math.max(slDistance, h1.atr * 1.2) : slDistance;
+  // Use ATR to refine SL distance if available (prefer H4 ATR for wider stop, avoid noise)
+  const referenceATR = h4 ? h4.atr : h1.atr;
+  const atrSL = referenceATR > 0 ? Math.max(slDistance, referenceATR * 1.2) : slDistance;
 
   const stopLoss    = round(direction === "BUY" ? livePrice - atrSL : livePrice + atrSL);
-  const actualRR    = 1.6; // minimum 1:1.6 (better than 1:1.5 required)
+  const actualRR    = 1.6; // minimum 1:1.6
   const tp1Distance = atrSL * actualRR;
   const tp2Distance = atrSL * 2.5;
   const tp3Distance = atrSL * 4.0;
@@ -599,11 +705,14 @@ function buildSignal(
   const trendDirection: AnalysisDetails["trendDirection"] =
     h1.trendDir === "UP" ? "HAUSSE" : h1.trendDir === "DOWN" ? "BAISSE" : "LATERAL";
 
-  const reasons = FRENCH_REASONS[direction];
-  const reason  = reasons[Math.floor(Math.random() * reasons.length)]!;
+  // Build a deterministic, context-aware reason (no Math.random)
+  const reason = buildReason(direction, conditions, h4 !== null);
+
+  // Timeframe string reflects all analyzed timeframes
+  const timeframeLabel = h4 ? "M1/M5/M15/H1/H4" : "M1/M5/M15/H1";
 
   logger.info(
-    { symbol: asset.symbol, direction, entry: livePrice, confidence, conditions: conditions.length },
+    { symbol: asset.symbol, direction, entry: livePrice, confidence, conditions: conditions.length, h4Available: h4 !== null },
     "✅ Signal haute qualité généré (multi-timeframe)"
   );
 
@@ -615,7 +724,7 @@ function buildSignal(
     takeProfit1,
     takeProfit2,
     takeProfit3,
-    timeframe:   "M1/M5/M15/H1",
+    timeframe:   timeframeLabel,
     confidence,
     riskPercent: riskPercents[riskLevel],
     reason,
@@ -637,7 +746,9 @@ function buildSignal(
 }
 
 // ─── Minimum confidence threshold ─────────────────────────────────────────────
-const MIN_CONFIDENCE = 90;
+// Require at least 88% confidence to broadcast a signal.
+// With H4 now adding up to 17 points, this effectively requires 5+ strong confirmations.
+const MIN_CONFIDENCE = 88;
 
 // ─── Public helpers ───────────────────────────────────────────────────────────
 function getBrokerKey(broker: string): string {
@@ -653,24 +764,29 @@ export function getBrokerAssets(broker: string): AssetInfo[] {
   return BROKER_ASSETS[getBrokerKey(broker)] ?? BROKER_ASSETS["default"]!;
 }
 
-// ─── Core: analyze one asset with multi-TF ────────────────────────────────────
+// ─── Core: analyze one asset with multi-TF (M1/M5/M15/H1/H4) ────────────────
 export async function generateSignalForAsset(
   asset: AssetInfo,
   riskLevel: RiskLevel = "MEDIUM",
 ): Promise<MarketSignal | null> {
-  logger.info({ symbol: asset.symbol }, "🔍 Analyse multi-timeframe démarrée");
+  logger.info({ symbol: asset.symbol }, "🔍 Analyse multi-timeframe démarrée (M1/M5/M15/H1/H4)");
 
-  // Fetch all timeframes (M1 always fresh; higher TFs cached more aggressively)
-  const [m1Data, m5Data, m15Data, h1Data] = await Promise.all([
+  // Fetch all timeframes in parallel — H4 fetched with more bars for macro context
+  const [m1Data, m5Data, m15Data, h1Data, h4Data] = await Promise.all([
     analyzeTF(asset.symbol, "M1",  80),
     analyzeTF(asset.symbol, "M5",  80),
     analyzeTF(asset.symbol, "M15", 80),
     analyzeTF(asset.symbol, "H1",  80),
+    analyzeTF(asset.symbol, "H4",  80),
   ]);
 
   if (!m1Data || !h1Data) {
     logger.warn({ symbol: asset.symbol }, "Données insuffisantes (M1 ou H1 manquants)");
     return null;
+  }
+
+  if (!h4Data) {
+    logger.info({ symbol: asset.symbol }, "H4 indisponible — analyse continue sans filtre macro");
   }
 
   // Get live price for precise entry (must come from Twelve Data — no fallback)
@@ -680,9 +796,9 @@ export async function generateSignalForAsset(
     return null;
   }
 
-  const mtfScore = scoreMTF(m1Data, m5Data, m15Data, h1Data, livePrice);
+  const mtfScore = scoreMTF(m1Data, m5Data, m15Data, h1Data, h4Data, livePrice);
   if (!mtfScore) {
-    logger.info({ symbol: asset.symbol }, "❌ Pas de direction claire sur H1 — signal rejeté");
+    logger.info({ symbol: asset.symbol }, "❌ Conditions non satisfaites — signal rejeté");
     return null;
   }
 
@@ -717,6 +833,6 @@ export async function generateSignals(
     }
   }
 
-  logger.info({ broker, count: signals.length }, "Scan terminé (multi-timeframe)");
+  logger.info({ broker, count: signals.length }, "Scan terminé (M1/M5/M15/H1/H4)");
   return signals;
 }

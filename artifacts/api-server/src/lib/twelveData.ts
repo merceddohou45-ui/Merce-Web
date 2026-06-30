@@ -240,7 +240,7 @@ export async function fetchBatchPrices(symbols: string[]): Promise<Record<string
     const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
     const data = (await response.json()) as BatchPriceResponse | PriceResponse;
 
-    if ("price" in data && data.price) {
+    if ("price" in data && typeof data.price === "string" && data.price) {
       const sym = needed[0]!;
       const price = parseFloat(data.price);
       if (!isNaN(price)) {

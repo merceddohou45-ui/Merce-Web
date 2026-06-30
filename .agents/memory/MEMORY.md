@@ -1,4 +1,7 @@
 - [Session table must be created manually](session-table.md) — connect-pg-simple v10 createTableIfMissing silently fails; create user_sessions table via SQL before first use
 - [connect-pg-simple pool vs conString](session-table.md) — pass pool from @workspace/db not conString; conString requires pg in api-server direct deps which monorepo doesn't have
 - [Orval TQ v5 query options cast](orval-tq-options.md) — generated hooks require queryKey in UseQueryOptions; cast partial options with `as any` for refetchInterval/enabled overrides
-- [PWA injectManifest + push SW](pwa-push.md) — use strategies:injectManifest+srcDir:src+filename:sw.ts; install workbox-precaching separately; PWAInstallModal must skip iframes and standalone; VAPID keys set via setEnvVars not secrets
+- [PWA injectManifest + push SW](pwa-push.md) — use strategies:injectManifest+srcDir:src+filename:sw.ts; install workbox-precaching separately; PWAInstallModal must skip iframes and standalone; workbox.runtimeCaching is ignored under injectManifest — put runtime caching inside sw.ts
+- [MTB maxScore normalization](mtb-market-engine.md) — maxScore must be context-aware: 127 when H4 available, 110 when not; fixed confidence threshold (88%) otherwise silently rejects all no-H4 signals
+- [MTB CORS in production](mtb-cors.md) — restrict to *.replit.app / *.replit.dev / *.repl.co patterns; origin:true + credentials:true is a CSRF risk with sameSite:"none" cookies
+- [twelveData.ts type narrowing](mtb-market-engine.md) — after "price" in data, add typeof data.price === "string" guard; BatchPriceResponse index sig makes data.price appear as string|object union

@@ -14,32 +14,43 @@ declare global {
   }
 }
 
-const STORAGE_KEY = "merced_pwa_install";
-const DISMISS_DAYS = 3;
+// Storage key for install state
+const STORAGE_KEY = "merced_pwa_install_v2";
 
-function getInstallState(): "never-show" | "show" | "dismissed-until" {
+// How long to suppress the modal after clicking "Plus tard" (4 hours, not days)
+const SNOOZE_MS = 4 * 60 * 60 * 1000;
+
+function isInstalled(): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return "show";
-    const data = JSON.parse(raw);
-    if (data.installed) return "never-show";
-    if (data.dismissedUntil && Date.now() < data.dismissedUntil) return "dismissed-until";
-    return "show";
+    if (!raw) return false;
+    return (JSON.parse(raw) as { installed?: boolean }).installed === true;
   } catch {
-    return "show";
+    return false;
   }
 }
 
-function markInstalled() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ installed: true })); } catch { /* */ }
+function isSnoozed(): boolean {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw) as { snoozedUntil?: number };
+    return typeof data.snoozedUntil === "number" && Date.now() < data.snoozedUntil;
+  } catch {
+    return false;
+  }
 }
 
-function markDismissed() {
+function markInstalled(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      dismissedUntil: Date.now() + DISMISS_DAYS * 24 * 60 * 60 * 1000,
-    }));
-  } catch { /* */ }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ installed: true }));
+  } catch { /* storage unavailable */ }
+}
+
+function snooze(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ snoozedUntil: Date.now() + SNOOZE_MS }));
+  } catch { /* storage unavailable */ }
 }
 
 type ModalState = "hidden" | "install" | "ios-guide";
@@ -50,49 +61,49 @@ export function PWAInstallModal() {
   const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    // Already installed as standalone app → never show
+    // Already installed as standalone app — never show
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (navigator as Navigator & { standalone?: boolean }).standalone === true;
     if (isStandalone) return;
 
-    // In iframe (Replit preview) → don't show
-    const isInIframe = window.self !== window.top;
-    if (isInIframe) return;
+    // In iframe (Replit preview) — skip install modal (can't install from iframe)
+    if (window.self !== window.top) return;
 
-    // Check localStorage state
-    const installState = getInstallState();
-    if (installState === "never-show" || installState === "dismissed-until") return;
+    // Already permanently installed — never show
+    if (isInstalled()) return;
 
-    // iOS Safari → show guide
+    // Snoozed by user — wait until snooze expires
+    if (isSnoozed()) return;
+
+    // iOS Safari — show installation guide
     const isIos =
       /iphone|ipad|ipod/i.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     if (isIos && isSafari) {
-      // Small delay so user sees the page first
-      const timer = setTimeout(() => setState("ios-guide"), 2000);
+      const timer = setTimeout(() => setState("ios-guide"), 1500);
       return () => clearTimeout(timer);
     }
 
     // Android / Desktop Chrome — wait for beforeinstallprompt
-    const handler = (e: BeforeInstallPromptEvent) => {
+    const handlePrompt = (e: BeforeInstallPromptEvent) => {
       e.preventDefault();
       setPrompt(e);
       setState("install");
     };
-    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("beforeinstallprompt", handlePrompt);
 
-    // appinstalled — mark permanently
-    const installedHandler = () => {
+    // appinstalled event — mark permanently and hide
+    const handleInstalled = () => {
       markInstalled();
       setState("hidden");
     };
-    window.addEventListener("appinstalled", installedHandler);
+    window.addEventListener("appinstalled", handleInstalled);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
-      window.removeEventListener("appinstalled", installedHandler);
+      window.removeEventListener("beforeinstallprompt", handlePrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
     };
   }, []);
 
@@ -113,8 +124,9 @@ export function PWAInstallModal() {
     }
   }, [prompt]);
 
+  // "Plus tard" snoozes for 4 hours — modal will re-appear next session
   const handleLater = useCallback(() => {
-    markDismissed();
+    snooze();
     setState("hidden");
   }, []);
 
@@ -128,7 +140,8 @@ export function PWAInstallModal() {
         <div className="relative bg-gradient-to-br from-accent/20 via-accent/5 to-transparent px-6 pt-6 pb-4">
           <button
             onClick={handleLater}
-            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors p-1"
+            aria-label="Plus tard"
+            className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md"
           >
             <X className="h-5 w-5" />
           </button>
@@ -138,20 +151,21 @@ export function PWAInstallModal() {
               <Activity className="h-8 w-8 text-accent" />
             </div>
             <div>
-              <h2 className="text-lg font-bold leading-tight">Merced Intelligence</h2>
+              <h2 className="text-lg font-bold leading-tight">Merced Trading Bot</h2>
               <p className="text-xs text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">
-                Application de trading
+                Application de trading MTB
               </p>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-6 pt-2">
           {state === "install" && (
             <>
               <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                Installez l'app pour recevoir des <strong className="text-foreground">signaux en temps réel</strong>, accéder à vos données hors ligne et profiter d'une expérience native sur votre appareil.
+                Installez l'app pour recevoir des <strong className="text-foreground">signaux en temps réel</strong>, 
+                accéder à vos données hors ligne et profiter d'une expérience native sur votre appareil.
               </p>
 
               <div className="flex gap-2 flex-col sm:flex-row">
@@ -182,7 +196,7 @@ export function PWAInstallModal() {
               </div>
 
               <p className="text-[11px] text-muted-foreground text-center mt-3">
-                Gratuit · Aucune donnée supplémentaire collectée
+                Gratuit · Compatible Android, iPhone et Desktop
               </p>
             </>
           )}
@@ -190,12 +204,13 @@ export function PWAInstallModal() {
           {state === "ios-guide" && (
             <>
               <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                Ajoutez l'app sur votre écran d'accueil pour une expérience optimale avec les signaux en temps réel.
+                Ajoutez MTB sur votre écran d'accueil pour recevoir des signaux en temps réel et profiter d'une expérience native.
               </p>
 
               <div className="space-y-3 mb-5">
                 <Step n={1} icon={<Share className="h-4 w-4 text-accent" />}>
-                  Appuyez sur le bouton <strong>Partager</strong> en bas de Safari
+                  Appuyez sur le bouton <strong>Partager</strong>{" "}
+                  <span className="text-muted-foreground">(icône en bas de Safari)</span>
                 </Step>
                 <Step n={2} icon={<Smartphone className="h-4 w-4 text-accent" />}>
                   Faites défiler et touchez <strong>« Sur l'écran d'accueil »</strong>

@@ -1,11 +1,37 @@
 /// <reference lib="webworker" />
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
+import { registerRoute } from "workbox-routing";
+import { NetworkFirst, CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Workbox precache manifest (injected at build time)
+// ─── Precache manifest (injected by Vite PWA at build time) ──────────────────
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
+
+// ─── Runtime caching strategies ──────────────────────────────────────────────
+
+// API calls: network-first, fall back to cache (max 10s network timeout)
+registerRoute(
+  ({ url }) => url.pathname.startsWith("/api/"),
+  new NetworkFirst({
+    cacheName: "mtb-api-cache",
+    networkTimeoutSeconds: 10,
+  })
+);
+
+// Icons and images: cache-first (long-lived assets)
+registerRoute(
+  ({ url }) => url.pathname.startsWith("/icons/") || url.pathname.match(/\.(png|jpg|jpeg|svg|ico|webp)$/),
+  new CacheFirst({ cacheName: "mtb-icon-cache" })
+);
+
+// Static JS/CSS chunks: stale-while-revalidate for fast loads
+registerRoute(
+  ({ request }) =>
+    request.destination === "script" || request.destination === "style",
+  new StaleWhileRevalidate({ cacheName: "mtb-static-cache" })
+);
 
 // ─── Push Notifications ──────────────────────────────────────────────────────
 self.addEventListener("push", (event) => {
@@ -23,10 +49,10 @@ self.addEventListener("push", (event) => {
   try {
     payload = event.data.json() as typeof payload;
   } catch {
-    payload = { title: "Merced Intelligence", body: event.data.text() };
+    payload = { title: "Merced Trading Bot", body: event.data.text() };
   }
 
-  const title = payload.title ?? "Merced Intelligence";
+  const title = payload.title ?? "Merced Trading Bot";
   const options: NotificationOptions = {
     body: payload.body ?? "Nouveau signal de trading disponible",
     icon: payload.icon ?? "/icons/icon-192.png",
