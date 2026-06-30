@@ -60,7 +60,7 @@ export default function ComptéTrading() {
       });
       setLocation("/dashboard");
     } catch (err: any) {
-      const msg = err?.response?.data?.error ?? "Une erreur est survenue.";
+      const msg = err?.data?.error ?? err?.message ?? "Une erreur est survenue.";
       toast({ variant: "destructive", title: "Erreur", description: msg });
     }
   };

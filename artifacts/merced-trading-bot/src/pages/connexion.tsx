@@ -27,7 +27,7 @@ export default function Connexion() {
         setLocation("/compte-trading");
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error ?? "Email ou mot de passe incorrect.";
+      const msg = err?.data?.error ?? err?.message ?? "Email ou mot de passe incorrect.";
       toast({ variant: "destructive", title: "Connexion échouée", description: msg });
     }
   };

@@ -36,7 +36,7 @@ export default function Inscription() {
         setLocation("/compte-trading");
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.error ?? "Une erreur est survenue.";
+      const msg = err?.data?.error ?? err?.message ?? "Une erreur est survenue.";
       toast({ variant: "destructive", title: "Erreur d'inscription", description: msg });
     }
   };
