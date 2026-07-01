@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, portfolioPositionTable, signalHistoryTable, tradingProfileTable } from "@workspace/db";
+import { db, portfolioPositionTable, signalHistoryTable, tradingAccountTable } from "@workspace/db";
 import { eq, desc, and, isNotNull } from "drizzle-orm";
 import {
   OpenPositionFromSignalBody,
@@ -85,13 +85,12 @@ router.post("/portfolio/open-from-signal", async (req, res): Promise<void> => {
     return;
   }
 
-  const [profile] = await db
-    .select()
-    .from(tradingProfileTable)
-    .orderBy(desc(tradingProfileTable.createdAt))
-    .limit(1);
+  // Read capital from the user's trading account (tradingAccountTable is source of truth)
+  const account = req.session?.userId
+    ? (await db.select().from(tradingAccountTable).where(eq(tradingAccountTable.userId, req.session.userId)).limit(1))[0]
+    : (await db.select().from(tradingAccountTable).orderBy(desc(tradingAccountTable.createdAt)).limit(1))[0];
 
-  const capital = profile ? parseNum(profile.capital) : 10000;
+  const capital = account ? parseNum(account.capital) : 10000;
 
   // Compute current equity from closed positions
   const closedPositions = await db
@@ -218,17 +217,14 @@ router.post("/portfolio/close/:id", async (req, res): Promise<void> => {
 
 // GET /portfolio/summary
 router.get("/portfolio/summary", async (req, res): Promise<void> => {
-  const [profile] = await db
-    .select()
-    .from(tradingProfileTable)
-    .orderBy(desc(tradingProfileTable.createdAt))
-    .limit(1);
+  // Read capital from the user's trading account (tradingAccountTable is source of truth)
+  const account = req.session?.userId
+    ? (await db.select().from(tradingAccountTable).where(eq(tradingAccountTable.userId, req.session.userId)).limit(1))[0]
+    : (await db.select().from(tradingAccountTable).orderBy(desc(tradingAccountTable.createdAt)).limit(1))[0];
 
-  const startingCapital = profile ? parseNum(profile.capital) : 10000;
-  const profitTarget = profile ? parseNum(profile.profitTarget) : startingCapital * 1.2;
-  const profitTargetPercent = profile?.profitTargetPercent
-    ? parseNum(profile.profitTargetPercent)
-    : ((profitTarget - startingCapital) / startingCapital) * 100;
+  const startingCapital = account ? parseNum(account.capital) : 10000;
+  const profitTarget = account ? parseNum(account.profitTarget) : startingCapital * 1.2;
+  const profitTargetPercent = ((profitTarget - startingCapital) / startingCapital) * 100;
 
   const allPositions = await db
     .select()
@@ -267,7 +263,7 @@ router.get("/portfolio/summary", async (req, res): Promise<void> => {
 
   // Seed the starting point
   const today = new Date();
-  const startDate = new Date(profile?.createdAt ?? today);
+  const startDate = new Date(account?.createdAt ?? today);
   startDate.setDate(startDate.getDate() - 1);
   equityMap.set(startDate.toISOString().split("T")[0]!, {
     equity: startingCapital,

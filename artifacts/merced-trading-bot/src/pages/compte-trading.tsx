@@ -12,6 +12,7 @@ import { useSaveTradingAccount } from "@workspace/api-client-react";
 const PLATFORMS = ["MetaTrader 4", "MetaTrader 5", "cTrader", "Exness", "Binance", "Bybit", "TradingView", "Autre"];
 
 const TIMEFRAMES = [
+  { value: "M1", label: "1 min" },
   { value: "M5", label: "5 min" },
   { value: "M15", label: "15 min" },
   { value: "H1", label: "1 heure" },

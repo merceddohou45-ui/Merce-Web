@@ -25,32 +25,26 @@ router.post("/broker/connect", async (req, res): Promise<void> => {
     .set({ connected: false, disconnectedAt: new Date() })
     .where(eq(brokerSessionTable.connected, true));
 
-  // Mask the API key for storage
+  // Mask the API key for storage — never log or expose raw credentials
   const maskedKey = apiKey.length > 8
     ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`
     : "****";
 
-  // Simulate broker connection — assign mock account details
-  const mockBalances: Record<string, number> = {
-    binance: 10000 + Math.random() * 5000,
-    bybit: 5000 + Math.random() * 3000,
-    exness: 15000 + Math.random() * 8000,
-    metatrader: 8000 + Math.random() * 4000,
-  };
+  // Account ID: derive from broker name + masked key for determinism (no Math.random)
+  // In a real integration this would come from the broker's API response.
+  const shortHash = Buffer.from(`${broker}:${apiKey.slice(-8)}`).toString("base64").replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 8);
+  const accountId = `${broker.slice(0, 3).toUpperCase()}-${shortHash}`;
 
-  const brokerKey = broker.toLowerCase().replace(/[^a-z]/g, "");
-  let matchedKey = "default";
-  for (const k of Object.keys(mockBalances)) {
-    if (brokerKey.includes(k)) { matchedKey = k; break; }
-  }
-  const balance = mockBalances[matchedKey] ?? 10000 + Math.random() * 5000;
+  // Balance is unknown until verified by the real broker API — set to 0 to be honest.
+  // Traders will see their actual balance inside their platform.
+  const balance = "0.00";
 
   const [session] = await db.insert(brokerSessionTable).values({
     broker,
     apiKey: apiKey.substring(0, 64),
     apiKeyMasked: maskedKey,
-    accountId: `ACC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-    balance: balance.toFixed(2),
+    accountId,
+    balance,
     currency: "USD",
     connected: true,
   }).returning();
