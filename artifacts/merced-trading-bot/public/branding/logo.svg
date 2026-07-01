@@ -1,0 +1,25 @@
+<svg viewBox="0 0 320 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dark background -->
+  <rect width="320" height="64" fill="#0B0B0B"/>
+
+  <!-- Icon container — 48×48, centered at y=8 -->
+  <rect x="8" y="8" width="48" height="48" rx="11" fill="#141414"/>
+  <rect x="8" y="8" width="48" height="48" rx="11" fill="none" stroke="#D4AF37" stroke-width="0.75" opacity="0.3"/>
+
+  <!-- MTB monogram in icon — scaled ×0.56 (80×28→44.8×15.7), offset (9.6,24.1) -->
+  <g transform="translate(9.6, 24.1) scale(0.56)" fill="#D4AF37">
+    <path d="M 0,28 L 0,0 L 4.5,0 L 12.5,11 L 20.5,0 L 25,0 L 25,28 L 20.5,28 L 20.5,6 L 12.5,16 L 4.5,6 L 4.5,28 Z"/>
+    <path d="M 32,0 L 54,0 L 54,4.5 L 45.25,4.5 L 45.25,28 L 40.75,28 L 40.75,4.5 L 32,4.5 Z"/>
+    <path d="M 61,0 L 61,28 L 65.5,28 L 65.5,0 Z"/>
+    <path fill-rule="evenodd" d="M 65.5,0 A 13,6.75 0 0 1 65.5,13.5 Z M 65.5,3 A 9.5,3.75 0 0 1 65.5,11 Z"/>
+    <path fill-rule="evenodd" d="M 65.5,14.5 A 14,6.75 0 0 1 65.5,28 Z M 65.5,17.5 A 10,3.75 0 0 1 65.5,25 Z"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="68" y="27" font-family="'Helvetica Neue', 'Arial', sans-serif" font-weight="600" font-size="20" letter-spacing="-0.3" fill="#FFFFFF">Merced</text>
+  <text x="68" y="45" font-family="'Helvetica Neue', 'Arial', sans-serif" font-weight="300" font-size="9.5" letter-spacing="3.5" fill="#D4AF37">TRADING BOT</text>
+
+  <!-- MTB badge -->
+  <rect x="277" y="23" width="36" height="18" rx="3" fill="#D4AF37" fill-opacity="0.12" stroke="#D4AF37" stroke-width="0.75" opacity="0.6"/>
+  <text x="295" y="35.5" font-family="'Helvetica Neue', 'Arial', sans-serif" font-weight="700" font-size="8" letter-spacing="1.5" fill="#D4AF37" text-anchor="middle">MTB</text>
+</svg>

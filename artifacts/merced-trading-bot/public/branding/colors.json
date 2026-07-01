@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json.schemastore.org/design-tokens.json",
+  "meta": {
+    "brand": "MercedTradingBot",
+    "version": "1.0.0",
+    "generated": "2026-06-30"
+  },
+
+  "primary": {
+    "black": {
+      "value": "#0B0B0B",
+      "description": "Brand black — primary background, icon backgrounds, primary surfaces",
+      "usage": ["backgrounds", "icon-bg", "high-contrast surfaces"]
+    },
+    "gold": {
+      "value": "#D4AF37",
+      "description": "Luxury gold — primary accent, logo mark, premium highlights",
+      "usage": ["logo-mark", "CTAs", "accent-text", "icon-highlight"],
+      "wcag": {
+        "on-black": "AA (contrast 7.3:1)",
+        "on-white": "AA (contrast 3.8:1 — use for decorative only)"
+      }
+    },
+    "white": {
+      "value": "#FFFFFF",
+      "description": "Pure white — primary text on dark, light mode background",
+      "usage": ["body-text", "headings-on-dark", "light-mode-bg"]
+    }
+  },
+
+  "secondary": {
+    "graphite": {
+      "value": "#1C1C1E",
+      "description": "Deep graphite — elevated surfaces, card backgrounds",
+      "usage": ["cards", "sidebar", "modal-bg"]
+    },
+    "graphite-mid": {
+      "value": "#2C2C2E",
+      "description": "Mid graphite — borders, dividers, secondary surfaces",
+      "usage": ["borders", "dividers", "hover-states"]
+    },
+    "graphite-light": {
+      "value": "#3A3A3C",
+      "description": "Light graphite — subtle interactive states",
+      "usage": ["pressed-states", "disabled-bg"]
+    },
+    "muted": {
+      "value": "#6B6B6B",
+      "description": "Muted text — secondary labels, captions, placeholders",
+      "usage": ["secondary-text", "placeholders", "captions"]
+    }
+  },
+
+  "accent": {
+    "emerald": {
+      "value": "#10B981",
+      "description": "Very subtle emerald — BUY signals, positive values, success states",
+      "usage": ["buy-signal", "profit", "success", "positive-delta"],
+      "note": "Use sparingly — max 15% of any composition"
+    },
+    "electric-blue": {
+      "value": "#60A5FA",
+      "description": "Very subtle electric blue — data highlights, AI indicators, info states",
+      "usage": ["data-viz", "AI-indicators", "info", "secondary-accent"],
+      "note": "Use sparingly — max 10% of any composition"
+    },
+    "destructive": {
+      "value": "#EF4444",
+      "description": "Alert red — SELL signals, losses, error states",
+      "usage": ["sell-signal", "loss", "error", "negative-delta"]
+    }
+  },
+
+  "gold-scale": {
+    "gold-100": "#FDF6DC",
+    "gold-200": "#F5E5A0",
+    "gold-300": "#EDD064",
+    "gold-400": "#D4AF37",
+    "gold-500": "#B8961E",
+    "gold-600": "#9B7D10",
+    "gold-700": "#7D6408",
+    "gold-800": "#5F4C04",
+    "gold-900": "#3D3102"
+  },
+
+  "gradients": {
+    "gold-vertical": "linear-gradient(180deg, #EDD064 0%, #D4AF37 40%, #B8961E 100%)",
+    "gold-radial": "radial-gradient(ellipse at 50% 20%, #1C1C1E 0%, #0B0B0B 100%)",
+    "dark-vignette": "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(212,175,55,0.06) 0%, transparent 100%)"
+  }
+}

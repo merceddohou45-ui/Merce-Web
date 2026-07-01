@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, LayoutDashboard, History, Settings, LogOut, PieChart, Brain } from "lucide-react";
+import { LayoutDashboard, History, Settings, LogOut, PieChart, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MtbLogo } from "@/components/mtb-logo";
 import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -32,14 +33,8 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background flex flex-col md:flex-row">
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col shrink-0">
-        <div className="p-6 border-b border-border flex items-center gap-3">
-          <div className="bg-accent/10 p-2 rounded-lg">
-            <Activity className="h-6 w-6 text-accent" />
-          </div>
-          <div>
-            <h1 className="font-bold text-lg leading-none tracking-tight">Merced</h1>
-            <p className="text-xs text-muted-foreground uppercase font-mono mt-1 tracking-widest">Intelligence</p>
-          </div>
+        <div className="p-5 border-b border-border">
+          <MtbLogo size={40} showWordmark />
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">

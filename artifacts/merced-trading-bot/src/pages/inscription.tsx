@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Activity, Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
+import { MtbLogo } from "@/components/mtb-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,8 +65,8 @@ export default function Inscription() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="bg-accent/10 border border-accent/20 rounded-2xl p-4 w-fit mb-5">
-            <Activity className="h-8 w-8 text-accent" />
+          <div className="mb-6">
+            <MtbLogo size={52} showWordmark />
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Créer un compte</h1>
           <p className="text-muted-foreground mt-2 text-sm">
@@ -146,7 +147,7 @@ export default function Inscription() {
             className="w-full h-14 text-base font-semibold bg-accent text-accent-foreground hover:bg-accent/90 rounded-xl mt-2 shadow-lg shadow-accent/20"
           >
             {register.isPending ? (
-              <Activity className="mr-2 h-5 w-5 animate-spin" />
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             ) : null}
             {register.isPending ? "Création en cours…" : "Créer mon compte"}
           </Button>

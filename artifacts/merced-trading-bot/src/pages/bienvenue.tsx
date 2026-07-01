@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
-  Activity,
   TrendingUp,
   TrendingDown,
   Shield,
@@ -14,7 +13,10 @@ import {
   Globe2,
   Lock,
   ChevronRight,
+  Activity,
+  Loader2,
 } from "lucide-react";
+import { MtbLogo } from "@/components/mtb-logo";
 import { Button } from "@/components/ui/button";
 import { useGetMe } from "@workspace/api-client-react";
 
@@ -192,17 +194,7 @@ export default function Bienvenue() {
 
       {/* ── Navigation ── */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
-        <div className="flex items-center gap-3">
-          <div className="bg-accent/15 border border-accent/25 rounded-xl p-2.5 shadow-lg shadow-accent/10">
-            <Activity className="h-5 w-5 text-accent" />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-lg tracking-tight">Merced</span>
-            <span className="hidden sm:block font-mono text-xs text-muted-foreground uppercase tracking-[0.2em] border border-border/50 rounded px-1.5 py-0.5">
-              Trading Bot
-            </span>
-          </div>
-        </div>
+        <MtbLogo size={38} showWordmark />
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
